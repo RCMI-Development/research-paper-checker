@@ -14,9 +14,12 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      // Cada cotejo es una página independiente; index.html solo las lanza.
+      // index.html es el directorio del Recinto; decinvest.html el Decanato de
+      // Investigación; cotejos.html el lanzador directo de los tres cotejos.
       input: {
         index: resolve(root, "index.html"),
+        decinvest: resolve(root, "decinvest.html"),
+        cotejos: resolve(root, "cotejos.html"),
         dei: resolve(root, "dei.html"),
         dgof: resolve(root, "dgof.html"),
         iroc: resolve(root, "iroc.html"),
