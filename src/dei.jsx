@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import {
-  C, F, DEFAULT_DEI_TERMS, Shell, Intake, Resultado, DatosCertificado, Certificado,
-  scanDei, deiSnippets, extractText, saveCase,
+  C, F, DEFAULT_DEI_TERMS, Shell, Intake, Resultado, DatosCertificado, Certificado, InformeHallazgos,
+  scanDei, hallazgosDei, extractText, saveCase,
 } from "./shared.jsx";
 
 /* Cotejo DEI — corre localmente sobre el texto extraído del PDF. No usa
@@ -11,7 +11,8 @@ import {
 function DeiPage() {
   const [file, setFile] = useState(null);
   const [text, setText] = useState("");
-  const [caseNo, setCaseNo] = useState(null);
+  const [paginas, setPaginas] = useState([]);
+  const [registroId, setRegistroId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ran, setRan] = useState(false);
@@ -34,7 +35,7 @@ function DeiPage() {
     try {
       const data = await extractText(file);
       setText(data.text);
-      setCaseNo(data.caseNo);
+      setPaginas(data.pages || [data.text]);
       setRan(true);
     } catch (e) {
       setErr(e.message || "No se pudo completar el cotejo.");
@@ -46,13 +47,15 @@ function DeiPage() {
   async function emitir() {
     setEmitido(true);
     try {
-      await saveCase({
-        caseNo, fileName: file?.name || null,
+      const r = await saveCase({
+        id: registroId,
+        fileName: file?.name || null,
         piName, proposalTitle,
         dei, verdict,
         model: "cotejo local (sin modelo)",
         signer: piName,
       });
+      if (r?.id) setRegistroId(r.id);
       setGuardado(true);
     } catch {
       setGuardado(false);
@@ -64,26 +67,19 @@ function DeiPage() {
       ? `Se encontraron ${dei.total} término${dei.total === 1 ? "" : "s"} DEI en la propuesta.`
       : "No se encontraron términos DEI en la propuesta.";
 
-  /* Cada término hallado, con el fragmento del texto donde aparece. */
-  const findings = useMemo(() => {
-    if (!dei || !dei.total) return [];
-    return Object.entries(dei.hits)
-      .sort((a, b) => b[1] - a[1])
-      .map(([term, n]) => ({
-        concepto: `«${term}» — ${n} aparición${n === 1 ? "" : "es"}`,
-        evidencia: deiSnippets(text, term)[0],
-        nota: deiSnippets(text, term)[1],
-      }));
-  }, [dei, text]);
+  const findings = useMemo(
+    () => (dei && dei.total ? hallazgosDei(paginas, dei.hits) : []),
+    [dei, paginas]
+  );
 
   const ready = file && !busy;
-  const paso3 = verdict === "clear";
+  const hayHallazgos = findings.length > 0;
+  const paso3 = !!verdict;
 
   return (
     <Shell
       tag="DEI"
       title="Cotejo DEI"
-      caseNo={caseNo}
       blurb="Conteo y ubicación de términos de diversidad, equidad e inclusión en el texto de la propuesta. Corre localmente, sin modelo de lenguaje: el mismo documento siempre da el mismo resultado."
     >
       <Intake
@@ -100,9 +96,7 @@ function DeiPage() {
           titulo="Resultado DEI"
           oracion={oracion}
           verdict={verdict}
-          caseNo={caseNo}
-          findings={findings}
-          accent={dei.total ? C.stampAmber : C.stampBlue}
+              accent={dei.total ? C.stampAmber : C.stampBlue}
           extra={dei.total ? (
             <div style={{
               marginTop: 14, paddingTop: 12, borderTop: `1px dashed ${C.rule}`,
@@ -118,16 +112,24 @@ function DeiPage() {
         <DatosCertificado
           piName={piName} setPiName={setPiName}
           proposalTitle={proposalTitle} setProposalTitle={setProposalTitle}
-          onEmitir={emitir} emitido={emitido}
+          onEmitir={emitir} emitido={emitido} hayHallazgos={hayHallazgos}
         />
       )}
 
-      {paso3 && emitido && (
+      {paso3 && emitido && hayHallazgos && (
+        <InformeHallazgos
+          cotejo="DEI"
+          piName={piName} proposalTitle={proposalTitle}
+          findings={findings} guardado={guardado}
+        />
+      )}
+
+      {paso3 && emitido && !hayHallazgos && (
         <Certificado
           cotejo="DEI"
           descripcion="fue cotejada localmente contra la lista institucional de términos de diversidad, equidad e inclusión, sin que se identificara ninguno en el texto."
           piName={piName} proposalTitle={proposalTitle}
-          caseNo={caseNo} guardado={guardado}
+          guardado={guardado}
         />
       )}
     </Shell>

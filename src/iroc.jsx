@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import {
-  C, Shell, Intake, Resultado, DatosCertificado, Certificado,
+  C, Shell, Intake, Resultado, DatosCertificado, Certificado, InformeHallazgos,
   ModelBar, useLmStudio, severityOf, runEvaluation, saveCase,
 } from "./shared.jsx";
 
@@ -14,7 +14,7 @@ function IrocPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [iroc, setIroc] = useState(null);
-  const [caseNo, setCaseNo] = useState(null);
+  const [registroId, setRegistroId] = useState(null);
   const [piName, setPiName] = useState("");
   const [proposalTitle, setProposalTitle] = useState("");
   const [emitido, setEmitido] = useState(false);
@@ -26,11 +26,10 @@ function IrocPage() {
   );
 
   async function run() {
-    setErr(""); setBusy(true); setIroc(null); setCaseNo(null);
+    setErr(""); setBusy(true); setIroc(null); setRegistroId(null);
     setEmitido(false); setGuardado(null);
     try {
       const data = await runEvaluation({ file, tasks: ["iroc"] });
-      setCaseNo(data.caseNo);
       setIroc(data.iroc);
     } catch (e) {
       setErr(e.message || "La evaluación no se completó. Revisa el documento e inténtalo otra vez.");
@@ -42,12 +41,14 @@ function IrocPage() {
   async function emitir() {
     setEmitido(true);
     try {
-      await saveCase({
-        caseNo, fileName: file?.name || null,
+      const r = await saveCase({
+        id: registroId,
+        fileName: file?.name || null,
         piName, proposalTitle,
         iroc, verdict, model: "openai/gpt-oss-20b",
         signer: piName,
       });
+      if (r?.id) setRegistroId(r.id);
       setGuardado(true);
     } catch {
       setGuardado(false);
@@ -61,27 +62,11 @@ function IrocPage() {
         ? "El documento no contiene información suficiente para determinar si hay infracciones IROC."
         : "Se encontraron infracciones IROC en la propuesta.";
 
-  const findings = useMemo(() => {
-    if (!iroc) return [];
-    const lista = [];
-    (iroc.foreign_sites || []).forEach((s) => lista.push({
-      concepto: `Sitio de investigación fuera de EE. UU. — ${s.entity || "entidad no nombrada"} (${s.country})`,
-      evidencia: s.evidence,
-      nota: s.role,
-    }));
-    (iroc.collaborators || []).forEach((c) => lista.push({
-      concepto: `Personal clave con afiliación extranjera — ${c.name || "nombre no indicado"}`,
-      evidencia: c.evidence,
-      nota: [c.affiliation, c.country].filter(Boolean).join(", "),
-    }));
-    if (!lista.length && iroc.rationale) {
-      lista.push({ concepto: "Observación del cotejo", nota: iroc.rationale });
-    }
-    return lista;
-  }, [iroc]);
+  const findings = iroc?.findings || [];
 
   const ready = file && !busy && health?.reachable;
-  const paso3 = verdict === "clear";
+  const hayHallazgos = findings.length > 0;
+  const paso3 = !!verdict;
 
   const aviso = verdict && verdict !== "clear" ? (
     <div style={{
@@ -97,7 +82,6 @@ function IrocPage() {
     <Shell
       tag="IROC"
       title="Cotejo IROC"
-      caseNo={caseNo}
       blurb="Evaluación de investigación internacional de preocupación: sitios fuera de EE. UU., personal clave con afiliación extranjera y entidades de preocupación."
       bar={<ModelBar health={health} />}
     >
@@ -115,9 +99,7 @@ function IrocPage() {
           titulo="Resultado IROC"
           oracion={oracion}
           verdict={verdict}
-          caseNo={caseNo}
-          findings={findings}
-          extra={aviso}
+              extra={aviso}
           accent={verdict === "clear" ? C.stampBlue : verdict === "stop" ? C.stampRed : C.stampAmber}
         />
       )}
@@ -126,16 +108,24 @@ function IrocPage() {
         <DatosCertificado
           piName={piName} setPiName={setPiName}
           proposalTitle={proposalTitle} setProposalTitle={setProposalTitle}
-          onEmitir={emitir} emitido={emitido}
+          onEmitir={emitir} emitido={emitido} hayHallazgos={hayHallazgos}
         />
       )}
 
-      {paso3 && emitido && (
+      {paso3 && emitido && hayHallazgos && (
+        <InformeHallazgos
+          cotejo="IROC"
+          piName={piName} proposalTitle={proposalTitle}
+          findings={findings} guardado={guardado}
+        />
+      )}
+
+      {paso3 && emitido && !hayHallazgos && (
         <Certificado
           cotejo="IROC"
           descripcion="fue evaluada mediante cotejo automatizado para investigación internacional de preocupación conforme a la USG Policy for Stopping High-Risk Life Sciences Research (julio de 2026), sin que se identificaran sitios ni personal clave fuera de Estados Unidos."
           piName={piName} proposalTitle={proposalTitle}
-          caseNo={caseNo} guardado={guardado}
+          guardado={guardado}
         />
       )}
     </Shell>

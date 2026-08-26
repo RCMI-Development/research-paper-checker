@@ -109,12 +109,11 @@ export function Card({ title, eyebrow, children, accent }) {
   );
 }
 
-export function Stamp({ verdict, caseNo }) {
+export function Stamp({ verdict }) {
   const map = {
-    clear:   { color: C.stampBlue,  text: "SIN HALLAZGO",      sub: "Apto para certificación" },
-    review:  { color: C.stampAmber, text: "REQUIERE REVISIÓN", sub: "Referir al IRE" },
-    stop:    { color: C.stampRed,   text: "NO CERTIFICABLE",   sub: "Posible investigación prohibida" },
-    unknown: { color: C.soft,       text: "INFORMACIÓN INSUFICIENTE", sub: "Consultar al PI" },
+    clear:    { color: C.stampBlue, text: "SIN HALLAZGO",  sub: "Apto para certificación" },
+    findings: { color: C.stampRed,  text: "CON HALLAZGOS",  sub: "No apto para certificación" },
+    unknown:  { color: C.soft,      text: "INFORMACIÓN INSUFICIENTE", sub: "Consultar al PI" },
   };
   const v = map[verdict] || map.unknown;
   return (
@@ -131,7 +130,7 @@ export function Stamp({ verdict, caseNo }) {
       <div style={{
         fontFamily: F.mono, fontSize: 9.5, marginTop: 7, letterSpacing: "0.1em",
         borderTop: `1px solid ${v.color}`, paddingTop: 5,
-      }}>{caseNo} · {new Date().toLocaleDateString("es-PR")}</div>
+      }}>{new Date().toLocaleDateString("es-PR")}</div>
     </div>
   );
 }
@@ -174,7 +173,7 @@ export function ModelBar({ health }) {
 
 /* ── armazón de página ── */
 
-export function Shell({ tag, title, blurb, caseNo, children, bar }) {
+export function Shell({ tag, title, blurb, children, bar }) {
   return (
     <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: F.body }}>
       <GlobalStyle />
@@ -189,7 +188,6 @@ export function Shell({ tag, title, blurb, caseNo, children, bar }) {
               }}>{title}</h1>
             </div>
             <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soft, textAlign: "right", lineHeight: 1.7 }}>
-              <div>{caseNo || "Sin radicar"}</div>
               <div>{tag}</div>
             </div>
           </div>
@@ -251,65 +249,83 @@ export function Intake({ file, setFile, onRun, busy, ready, runLabel, err, note 
 
 /* ── Paso 02 — resultado ── */
 
-/* Un hallazgo: el concepto que no cumple y la cita del texto donde aparece. */
+/* Lista de criterios que no se cumplen: regla, página y la oración
+   del documento donde aparece. */
 export function Findings({ items }) {
   if (!items?.length) return null;
   return (
-    <div style={{ marginTop: 6 }}>
-      <Label style={{ marginBottom: 8 }}>Conceptos que no cumplen</Label>
+    <ol style={{ margin: "14px 0 0", padding: 0, listStyle: "none" }}>
       {items.map((f, i) => (
-        <div key={i} style={{
-          borderTop: `1px solid ${C.rule}`, padding: "10px 0",
-        }}>
-          <div style={{ fontWeight: 600, fontSize: 14.5, lineHeight: 1.45 }}>{f.concepto}</div>
-          {f.evidencia && (
-            <div style={{
-              fontFamily: F.mono, fontSize: 12.5, color: C.ink, background: C.tint,
-              borderLeft: `3px solid ${C.stampAmber}`, padding: "7px 10px", marginTop: 6,
-              lineHeight: 1.5,
-            }}>
-              «{f.evidencia}»
+        <li key={i} style={{ borderTop: `1px solid ${C.rule}`, padding: "12px 0" }}>
+          <div style={{ display: "flex", gap: 10 }}>
+            <span style={{
+              fontFamily: F.mono, fontSize: 13, color: C.stampRed, fontWeight: 600,
+              minWidth: 20, flexShrink: 0,
+            }}>{i + 1}.</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14.5, lineHeight: 1.45 }}>
+                {f.criterion || `Rule ${f.rule}`}
+              </div>
+              <div style={{
+                fontFamily: F.mono, fontSize: 11, color: C.soft, letterSpacing: ".06em",
+                marginTop: 3,
+              }}>
+                {[f.rule ? `RULE ${f.rule}` : null, f.page ? `PAGE ${f.page}` : null]
+                  .filter(Boolean).join(" · ")}
+              </div>
+              {f.sentence && (
+                <div style={{
+                  fontSize: 13.5, color: C.ink, background: C.tint,
+                  borderLeft: `3px solid ${C.stampAmber}`, padding: "8px 11px",
+                  marginTop: 7, lineHeight: 1.55, fontStyle: "italic",
+                }}>
+                  {f.sentence}
+                </div>
+              )}
             </div>
-          )}
-          {f.nota && (
-            <div style={{ fontSize: 13.5, color: C.soft, marginTop: 5, lineHeight: 1.5 }}>{f.nota}</div>
-          )}
-        </div>
+          </div>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
 
-export function Resultado({ paso, titulo, oracion, verdict, caseNo, findings, extra, accent }) {
+export function Resultado({ paso, titulo, oracion, verdict, extra, accent }) {
   const limpio = verdict === "clear";
+  /* El sello sale siempre. El detalle de los hallazgos vive en el paso 04. */
+  const sello = limpio ? "clear" : verdict === "unknown" ? "unknown" : "findings";
   return (
     <Card title={titulo} eyebrow={paso} accent={accent}>
       <p style={{ fontSize: 16, lineHeight: 1.55, margin: 0, fontWeight: limpio ? 400 : 600 }}>
         {oracion}
       </p>
-      {limpio ? (
-        <div style={{ padding: "18px 0 6px" }}><Stamp verdict="clear" caseNo={caseNo} /></div>
-      ) : (
-        <Findings items={findings} />
-      )}
+      <div style={{ padding: "18px 0 6px" }}>
+        <Stamp verdict={sello} />
+      </div>
       {extra}
     </Card>
   );
 }
 
-/* ── Paso 03 — datos para el certificado ── */
+/* ── Paso 03 — datos del documento (se pide en ambos casos) ── */
 
-export function DatosCertificado({ piName, setPiName, proposalTitle, setProposalTitle, onEmitir, emitido }) {
+export function DatosCertificado({
+  piName, setPiName, proposalTitle, setProposalTitle, onEmitir, emitido, hayHallazgos,
+}) {
   const campo = {
     width: "100%", padding: "10px 12px", border: `1px solid ${C.rule}`,
     fontFamily: F.body, fontSize: 15, background: "#fff",
   };
   const listo = piName.trim() && proposalTitle.trim();
+  const etiqueta = hayHallazgos ? "informe de hallazgos" : "certificado";
 
   return (
-    <Card title="Datos del certificado" eyebrow="Paso 03">
+    <Card title={`Datos del ${hayHallazgos ? "informe" : "certificado"}`} eyebrow="Paso 03"
+      accent={hayHallazgos ? C.stampAmber : C.rule}>
       <p style={{ fontSize: 14, color: C.soft, lineHeight: 1.55, margin: "0 0 14px" }}>
-        El cotejo no identificó hallazgos. Provee los datos con los que se emitirá el certificado.
+        {hayHallazgos
+          ? "Provee los datos con los que se emitirá el informe de hallazgos."
+          : "El cotejo no identificó hallazgos. Provee los datos con los que se emitirá el certificado."}
       </p>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <label style={{ flex: "1 1 240px" }}>
@@ -324,53 +340,100 @@ export function DatosCertificado({ piName, setPiName, proposalTitle, setProposal
         </label>
       </div>
       <button className="btn" style={{ marginTop: 14 }} onClick={onEmitir} disabled={!listo}>
-        {emitido ? "Actualizar certificado" : "Emitir certificado"}
+        {emitido ? `Actualizar ${etiqueta}` : `Emitir ${etiqueta}`}
       </button>
     </Card>
   );
 }
 
-/* ── Paso 04 — certificado ── */
+/* ── Paso 04 — documento descargable ── */
 
-export function Certificado({ cotejo, descripcion, piName, proposalTitle, caseNo, guardado }) {
+function useDescarga({ cotejo, descripcion, piName, proposalTitle, findings }) {
   const [bajando, setBajando] = useState(false);
   const [errorPdf, setErrorPdf] = useState("");
 
-  const fecha = new Date().toLocaleDateString("es-PR", {
-    day: "numeric", month: "long", year: "numeric",
-  });
-
-  /* El PDF lo arma el servidor y el navegador lo baja como archivo:
-     no hay diálogo de impresión de por medio. */
   async function descargar() {
     setBajando(true); setErrorPdf("");
     try {
       const r = await fetch("/api/certificado", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cotejo, descripcion, piName, proposalTitle, caseNo }),
+        body: JSON.stringify({ cotejo, descripcion, piName, proposalTitle, findings }),
       });
       if (!r.ok) throw new Error("No se pudo generar el PDF");
 
       const disp = r.headers.get("Content-Disposition") || "";
-      const nombre = (disp.match(/filename="([^"]+)"/) || [])[1]
-        || `Certificado-${cotejo}-${caseNo}.pdf`;
+      const nombre = (disp.match(/filename="([^"]+)"/) || [])[1] || `${cotejo}.pdf`;
 
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = nombre;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      a.href = url; a.download = nombre;
+      document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setErrorPdf(e.message || "No se pudo descargar el certificado.");
+      setErrorPdf(e.message || "No se pudo descargar el documento.");
     } finally {
       setBajando(false);
     }
   }
+  return { descargar, bajando, errorPdf };
+}
+
+function BotonDescarga({ descargar, bajando, errorPdf, texto }) {
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+      <button className="btn" onClick={descargar} disabled={bajando}>
+        {bajando ? "Generando…" : texto}
+      </button>
+      {errorPdf && <span style={{ fontSize: 13, color: C.stampRed }}>{errorPdf}</span>}
+    </div>
+  );
+}
+
+const AvisoEnvio = () => (
+  <div style={{ padding: 14, background: C.tint, border: `1px dashed ${C.stampBlue}`, margin: "14px 0" }}>
+    <Label style={{ color: C.stampBlue }}>Próximo paso</Label>
+    <p style={{ fontSize: 14.5, lineHeight: 1.6, margin: "6px 0 0" }}>
+      Este documento debe ser enviado al <b>Sr. Camacho</b> y a la <b>Dra. Segarra</b>.
+    </p>
+  </div>
+);
+
+export function InformeHallazgos({ cotejo, piName, proposalTitle, findings, guardado }) {
+  const d = useDescarga({ cotejo, piName, proposalTitle, findings });
+  const fecha = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+  return (
+    <Card title="Findings report" eyebrow="Paso 04" accent={C.stampRed}>
+      <div style={{ background: "#fff", border: `1px solid ${C.rule}`, padding: "20px 22px", marginBottom: 14 }}>
+        <div style={{ fontFamily: F.display, fontSize: 22, fontWeight: 700, letterSpacing: ".04em",
+          textTransform: "uppercase", color: C.stampRed }}>
+          Findings report · {cotejo} screening
+        </div>
+        <div style={{ fontFamily: F.mono, fontSize: 11.5, color: C.soft, marginTop: 8, lineHeight: 1.8 }}>
+          <div>INVESTIGATOR · <span style={{ color: C.ink }}>{piName}</span></div>
+          <div>PROPOSAL · <span style={{ color: C.ink }}>{proposalTitle}</span></div>
+          <div>DATE · <span style={{ color: C.ink }}>{fecha}</span></div>
+        </div>
+        <div style={{ marginTop: 10, borderTop: `1px solid ${C.rule}` }}>
+          <Findings items={findings} />
+        </div>
+      </div>
+      <AvisoEnvio />
+      <BotonDescarga {...d} texto="Descargar informe (PDF)" />
+      {guardado === true && (
+        <p style={{ fontFamily: F.mono, fontSize: 11.5, color: C.stampBlue, margin: "12px 0 0" }}>
+          Guardado en el expediente local
+        </p>
+      )}
+    </Card>
+  );
+}
+
+export function Certificado({ cotejo, descripcion, piName, proposalTitle, guardado }) {
+  const d = useDescarga({ cotejo, descripcion, piName, proposalTitle });
+  const fecha = new Date().toLocaleDateString("es-PR", { day: "numeric", month: "long", year: "numeric" });
 
   return (
     <Card title="Certificado" eyebrow="Paso 04">
@@ -378,112 +441,64 @@ export function Certificado({ cotejo, descripcion, piName, proposalTitle, caseNo
         background: "#fff", border: `2px solid ${C.ink}`, padding: "38px 34px",
         textAlign: "center", marginBottom: 16,
       }}>
-        <div style={{
-          fontFamily: F.display, fontSize: 12.5, letterSpacing: "0.18em",
-          textTransform: "uppercase", color: C.soft, fontWeight: 600,
-        }}>
+        <div style={{ fontFamily: F.display, fontSize: 12.5, letterSpacing: "0.18em",
+          textTransform: "uppercase", color: C.soft, fontWeight: 600 }}>
           Universidad de Puerto Rico · Recinto de Ciencias Médicas
         </div>
-        <div style={{
-          fontFamily: F.display, fontSize: 12.5, letterSpacing: "0.18em",
-          textTransform: "uppercase", color: C.soft, fontWeight: 600, marginTop: 2,
-        }}>
+        <div style={{ fontFamily: F.display, fontSize: 12.5, letterSpacing: "0.18em",
+          textTransform: "uppercase", color: C.soft, fontWeight: 600, marginTop: 2 }}>
           Decanato de Investigación
         </div>
 
-        <h2 style={{
-          fontFamily: F.display, fontSize: 34, fontWeight: 700, letterSpacing: "0.05em",
-          textTransform: "uppercase", margin: "22px 0 4px", lineHeight: 1.05,
-        }}>
+        <h2 style={{ fontFamily: F.display, fontSize: 34, fontWeight: 700, letterSpacing: "0.05em",
+          textTransform: "uppercase", margin: "22px 0 4px", lineHeight: 1.05 }}>
           Certificado de cumplimiento
         </h2>
-        <div style={{
-          fontFamily: F.display, fontSize: 19, letterSpacing: "0.12em",
-          textTransform: "uppercase", color: C.stampBlue, fontWeight: 600,
-        }}>
+        <div style={{ fontFamily: F.display, fontSize: 19, letterSpacing: "0.12em",
+          textTransform: "uppercase", color: C.stampBlue, fontWeight: 600 }}>
           Cotejo {cotejo}
         </div>
 
-        <div style={{
-          width: 68, height: 2, background: C.ink, margin: "22px auto",
-        }} />
+        <div style={{ width: 68, height: 2, background: C.ink, margin: "22px auto" }} />
 
         <p style={{ fontSize: 15, color: C.soft, margin: "0 0 6px", fontStyle: "italic" }}>
           Se certifica que la propuesta
         </p>
-        <p style={{
-          fontFamily: F.body, fontSize: 21, fontWeight: 600, margin: "0 auto 20px",
-          maxWidth: 560, lineHeight: 1.35,
-        }}>
+        <p style={{ fontFamily: F.body, fontSize: 21, fontWeight: 600, margin: "0 auto 20px",
+          maxWidth: 560, lineHeight: 1.35 }}>
           {proposalTitle}
         </p>
 
         <p style={{ fontSize: 15, color: C.soft, margin: "0 0 6px", fontStyle: "italic" }}>
           sometida por
         </p>
-        <p style={{
-          fontFamily: F.display, fontSize: 30, fontWeight: 700, letterSpacing: "0.03em",
-          margin: "0 0 22px", lineHeight: 1.15,
-        }}>
+        <p style={{ fontFamily: F.display, fontSize: 30, fontWeight: 700, letterSpacing: "0.03em",
+          margin: "0 0 22px", lineHeight: 1.15 }}>
           {piName}
         </p>
 
-        <p style={{
-          fontSize: 14.5, lineHeight: 1.65, color: C.ink, maxWidth: 580,
-          margin: "0 auto 26px",
-        }}>
+        <p style={{ fontSize: 14.5, lineHeight: 1.65, color: C.ink, maxWidth: 580, margin: "0 auto 26px" }}>
           {descripcion}
         </p>
 
-        <div style={{
-          display: "flex", justifyContent: "space-between", gap: 20, flexWrap: "wrap",
-          borderTop: `1px solid ${C.rule}`, paddingTop: 14, fontFamily: F.mono, fontSize: 11.5,
-          color: C.soft, textAlign: "left",
-        }}>
-          <div>
-            <div style={{ letterSpacing: ".08em" }}>EXPEDIENTE</div>
-            <div style={{ color: C.ink, fontSize: 13, marginTop: 2 }}>{caseNo}</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ letterSpacing: ".08em" }}>FECHA DE EMISIÓN</div>
-            <div style={{ color: C.ink, fontSize: 13, marginTop: 2 }}>{fecha}</div>
-          </div>
+        <div style={{ borderTop: `1px solid ${C.rule}`, paddingTop: 14,
+          fontFamily: F.mono, fontSize: 11.5, color: C.soft, textAlign: "center" }}>
+          <div style={{ letterSpacing: ".08em" }}>FECHA DE EMISIÓN</div>
+          <div style={{ color: C.ink, fontSize: 13, marginTop: 2 }}>{fecha}</div>
         </div>
 
-        <p style={{
-          fontSize: 11.5, color: C.soft, lineHeight: 1.55, marginTop: 18, marginBottom: 0,
-          fontStyle: "italic",
-        }}>
+        <p style={{ fontSize: 11.5, color: C.soft, lineHeight: 1.55, marginTop: 18, marginBottom: 0,
+          fontStyle: "italic" }}>
           Documento generado por cotejo automatizado como ayuda de triaje. No sustituye
           la atestación del investigador principal ni la certificación del ICDGOF.
         </p>
       </div>
 
-      <div className="no-print" style={{
-        padding: 14, background: C.tint, border: `1px dashed ${C.stampBlue}`, marginBottom: 14,
-      }}>
-        <Label style={{ color: C.stampBlue }}>Próximo paso</Label>
-        <p style={{ fontSize: 14.5, lineHeight: 1.6, margin: "6px 0 0" }}>
-          Este certificado debe ser enviado al <b>Sr. Camacho</b> y a la <b>Dra. Segarra</b>.
-        </p>
-      </div>
-
-      <div className="no-print" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <button className="btn" onClick={descargar} disabled={bajando}>
-          {bajando ? "Generando…" : "Descargar certificado (PDF)"}
-        </button>
-        {errorPdf && (
-          <span style={{ fontSize: 13, color: C.stampRed }}>{errorPdf}</span>
-        )}
-      </div>
+      <div className="no-print"><AvisoEnvio /></div>
+      <div className="no-print"><BotonDescarga {...d} texto="Descargar certificado (PDF)" /></div>
       {guardado === true && (
-        <p style={{ fontFamily: F.mono, fontSize: 11.5, color: C.stampBlue, marginBottom: 0, marginTop: 12 }}>
-          Guardado en el expediente local · {caseNo}
-        </p>
-      )}
-      {guardado === false && (
-        <p style={{ fontFamily: F.mono, fontSize: 11.5, color: C.stampRed, marginBottom: 0, marginTop: 12 }}>
-          Aviso: no se pudo guardar en el expediente local
+        <p className="no-print" style={{ fontFamily: F.mono, fontSize: 11.5, color: C.stampBlue, margin: "12px 0 0" }}>
+          Guardado en el expediente local
         </p>
       )}
     </Card>
@@ -503,6 +518,39 @@ export function scanDei(text, termList) {
   });
   const words = text.trim().split(/\s+/).length;
   return { hits, total, words, density: words ? (total / words) * 1000 : 0 };
+}
+
+/* Localiza cada término en las páginas: devuelve la página y la oración
+   completa donde aparece, igual que los hallazgos de DGOF/IROC. */
+/* La extracción de PDF no siempre deja límites de oración limpios. Si el
+   fragmento sale enorme, se recorta a una ventana alrededor del término. */
+function recorta(frase, term, max = 280) {
+  if (frase.length <= max) return frase;
+  const i = frase.toLowerCase().indexOf(term.toLowerCase());
+  if (i < 0) return frase.slice(0, max).trim() + "…";
+  const ini = Math.max(0, i - Math.floor(max / 2));
+  const fin = Math.min(frase.length, ini + max);
+  return (ini > 0 ? "…" : "") + frase.slice(ini, fin).trim() + (fin < frase.length ? "…" : "");
+}
+
+export function hallazgosDei(paginas, hits) {
+  const salida = [];
+  Object.keys(hits).forEach((term) => {
+    const re = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+    for (let i = 0; i < paginas.length; i++) {
+      const oraciones = (paginas[i] || "").split(/(?<=[.!?])\s+/);
+      const frase = oraciones.find((o) => re.test(o));
+      if (frase) {
+        salida.push({
+          criterion: `Use of DEI terminology: "${term}"`,
+          page: i + 1,
+          sentence: recorta(frase.trim(), term),
+        });
+        break;
+      }
+    }
+  });
+  return salida;
 }
 
 /* Extrae el contexto alrededor de cada aparición, para mostrar dónde en el

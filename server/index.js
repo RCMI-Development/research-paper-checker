@@ -7,8 +7,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import db from "./db.js";
-import { DGOF_PROMPT, IROC_PROMPT } from "./prompts.js";
-import { construirCertificado, nombreArchivo } from "./certificado.js";
+import { DGOF_PROMPT, IROC_PROMPT, DGOF_RULES, IROC_RULES } from "./prompts.js";
+import { construirCertificado, construirInforme, nombreArchivo } from "./certificado.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, "..", "data", "uploads");
@@ -27,17 +27,6 @@ const app = express();
 app.use(express.json({ limit: "2mb" }));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
-
-function caseNumber() {
-  const year = new Date().getFullYear();
-  for (let i = 0; i < 20; i++) {
-    const n = Math.floor(Math.random() * 9000 + 1000);
-    const candidate = `RCM-${year}-${n}`;
-    const exists = db.prepare("SELECT 1 FROM cases WHERE case_no = ?").get(candidate);
-    if (!exists) return candidate;
-  }
-  return `RCM-${year}-${Date.now()}`;
-}
 
 function extractJson(raw) {
   const cleaned = raw.replace(/```json|```/gi, "").trim();
@@ -92,39 +81,88 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-async function fileToText(file) {
-  if (file.mimetype === "application/pdf") {
-    const parsed = await pdfParse(file.buffer);
-    return parsed.text;
+/* Devuelve el texto separado por página. El número de página es parte del
+   hallazgo, así que no basta con el texto plano que da pdf-parse. */
+async function fileToPages(file) {
+  if (file.mimetype !== "application/pdf") {
+    return [file.buffer.toString("utf8")];
   }
-  return file.buffer.toString("utf8");
+  const paginas = [];
+  try {
+    await pdfParse(file.buffer, {
+    pagerender: (pageData) =>
+      pageData.getTextContent().then((tc) => {
+        const t = tc.items.map((i) => i.str).join(" ").replace(/\s+/g, " ").trim();
+        paginas.push(t);
+          return t;
+        }),
+    });
+  } catch (e) {
+    throw new Error(
+      "No se pudo leer el PDF (" + e.message + "). Puede estar dañado o protegido; " +
+      "vuelve a exportarlo desde el programa original e inténtalo otra vez."
+    );
+  }
+  return paginas.length ? paginas : [""];
 }
 
-async function persistUpload(file, caseNo) {
+const unirPaginas = (paginas) => paginas.join("\n\n");
+
+/* Texto etiquetado que ve el modelo. */
+const paginasEtiquetadas = (paginas) =>
+  paginas.map((t, i) => `[PAGE ${i + 1}]\n${t}`).join("\n\n");
+
+const normaliza = (s) => (s || "").toLowerCase().replace(/[^a-z0-9 ]+/gi, " ").replace(/\s+/g, " ").trim();
+
+/* El modelo se equivoca contando páginas. Si la oración aparece de verdad en
+   alguna página, esa gana sobre lo que el modelo haya dicho. */
+function verificaPagina(hallazgo, paginas) {
+  const frase = normaliza(hallazgo.sentence);
+  if (frase.length >= 20) {
+    const clave = frase.slice(0, 60);
+    const idx = paginas.findIndex((p) => normaliza(p).includes(clave));
+    if (idx >= 0) return { ...hallazgo, page: idx + 1, verificada: true };
+  }
+  const n = Number(hallazgo.page);
+  return {
+    ...hallazgo,
+    page: Number.isFinite(n) && n >= 1 && n <= paginas.length ? n : null,
+    verificada: false,
+  };
+}
+
+/* Adjunta el texto canónico del criterio. El modelo solo devuelve el número
+   de regla; la redacción sale de aquí para que no derive. */
+const revisaHallazgos = (informe, paginas, reglas) =>
+  !informe ? informe
+    : {
+        ...informe,
+        findings: (informe.findings || []).map((f) => ({
+          ...verificaPagina(f, paginas),
+          criterion: reglas[f.rule] || `Regla ${f.rule}`,
+        })),
+      };
+
+async function persistUpload(file) {
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const filePath = path.join(UPLOAD_DIR, `${caseNo}-${safeName}`);
+  const sello = new Date().toISOString().replace(/[:.]/g, "-");
+  const filePath = path.join(UPLOAD_DIR, `${sello}-${safeName}`);
   await fs.writeFile(filePath, file.buffer);
   return filePath;
 }
-
-/* Reserva un número de expediente sin correr ningún modelo. Lo usa el cotejo
-   DEI, que es puramente local y no necesita pasar por LM Studio. */
-app.get("/api/case-number", (_req, res) => {
-  res.json({ caseNo: caseNumber() });
-});
 
 /* Extrae el texto de un PDF sin evaluarlo. */
 app.post("/api/extract", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No se recibió ningún archivo." });
-    const text = await fileToText(req.file);
+    const paginas = await fileToPages(req.file);
+    const text = unirPaginas(paginas);
     if (!text || text.trim().length < 40) {
       return res.status(400).json({ error: "El texto de la propuesta es demasiado corto o no se pudo extraer." });
     }
-    const caseNo = caseNumber();
-    const filePath = await persistUpload(req.file, caseNo);
-    res.json({ caseNo, fileName: req.file.originalname, filePath, text });
+    const filePath = await persistUpload(req.file);
+    res.json({ fileName: req.file.originalname, filePath, text, pages: paginas });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message || e) });
@@ -133,32 +171,35 @@ app.post("/api/extract", upload.single("file"), async (req, res) => {
 
 app.post("/api/evaluate", upload.single("file"), async (req, res) => {
   try {
-    let text = req.body.text || "";
+    let paginas = req.body.text ? [req.body.text] : [];
     let fileName = null;
 
     if (req.file) {
       fileName = req.file.originalname;
-      text = await fileToText(req.file);
+      paginas = await fileToPages(req.file);
     }
+    const text = unirPaginas(paginas);
 
     if (!text || text.trim().length < 40) {
       return res.status(400).json({ error: "El texto de la propuesta es demasiado corto o no se pudo extraer." });
     }
 
-    const caseNo = caseNumber();
-    const filePath = req.file ? await persistUpload(req.file, caseNo) : null;
+    const filePath = req.file ? await persistUpload(req.file) : null;
 
+    const etiquetado = paginasEtiquetadas(paginas);
     const tasks = (req.body.tasks ?? "dgof,iroc").split(",").map((t) => t.trim()).filter(Boolean);
-    const [dgof, iroc] = await Promise.all([
-      tasks.includes("dgof") ? askLmStudio(DGOF_PROMPT, text) : Promise.resolve(null),
-      tasks.includes("iroc") ? askLmStudio(IROC_PROMPT, text) : Promise.resolve(null),
+    const [dgofBruto, irocBruto] = await Promise.all([
+      tasks.includes("dgof") ? askLmStudio(DGOF_PROMPT, etiquetado) : Promise.resolve(null),
+      tasks.includes("iroc") ? askLmStudio(IROC_PROMPT, etiquetado) : Promise.resolve(null),
     ]);
+    const dgof = revisaHallazgos(dgofBruto, paginas, DGOF_RULES);
+    const iroc = revisaHallazgos(irocBruto, paginas, IROC_RULES);
 
     res.json({
-      caseNo,
       fileName,
       filePath,
       proposalExcerpt: text.slice(0, 4000),
+      numPages: paginas.length,
       model: MODEL,
       dgof,
       iroc,
@@ -170,20 +211,11 @@ app.post("/api/evaluate", upload.single("file"), async (req, res) => {
 });
 
 app.post("/api/cases", (req, res) => {
-  const { caseNo, fileName, filePath, proposalExcerpt, dei, dgof, iroc,
+  const { id, fileName, filePath, proposalExcerpt, dei, dgof, iroc,
           verdict, model, signer, piName, proposalTitle } = req.body;
-  if (!caseNo || !verdict) return res.status(400).json({ error: "Faltan caseNo o verdict" });
+  if (!verdict) return res.status(400).json({ error: "Falta verdict" });
 
-  const stmt = db.prepare(`
-    INSERT INTO cases (case_no, file_name, file_path, proposal_excerpt, dei_report, dgof_report, iroc_report, verdict, model, signer, signed_at, pi_name, proposal_title)
-    VALUES (@case_no, @file_name, @file_path, @proposal_excerpt, @dei_report, @dgof_report, @iroc_report, @verdict, @model, @signer, @signed_at, @pi_name, @proposal_title)
-    ON CONFLICT(case_no) DO UPDATE SET
-      dei_report=excluded.dei_report, dgof_report=excluded.dgof_report, iroc_report=excluded.iroc_report,
-      verdict=excluded.verdict, model=excluded.model, signer=excluded.signer, signed_at=excluded.signed_at,
-      pi_name=excluded.pi_name, proposal_title=excluded.proposal_title
-  `);
-  stmt.run({
-    case_no: caseNo,
+  const datos = {
     file_name: fileName || null,
     file_path: filePath || null,
     proposal_excerpt: proposalExcerpt || null,
@@ -196,21 +228,47 @@ app.post("/api/cases", (req, res) => {
     signed_at: signer ? new Date().toISOString() : null,
     pi_name: piName || null,
     proposal_title: proposalTitle || null,
-  });
-  res.json({ ok: true });
+  };
+
+  /* Sin número de expediente, la identidad del registro es su id. El cliente
+     lo guarda y lo devuelve al reemitir, para actualizar en vez de duplicar. */
+  if (id) {
+    db.prepare(`
+      UPDATE cases SET
+        file_name=@file_name, file_path=@file_path, proposal_excerpt=@proposal_excerpt,
+        dei_report=@dei_report, dgof_report=@dgof_report, iroc_report=@iroc_report,
+        verdict=@verdict, model=@model, signer=@signer, signed_at=@signed_at,
+        pi_name=@pi_name, proposal_title=@proposal_title
+      WHERE id=@id
+    `).run({ ...datos, id });
+    return res.json({ ok: true, id });
+  }
+
+  const info = db.prepare(`
+    INSERT INTO cases (file_name, file_path, proposal_excerpt, dei_report, dgof_report,
+                       iroc_report, verdict, model, signer, signed_at, pi_name, proposal_title)
+    VALUES (@file_name, @file_path, @proposal_excerpt, @dei_report, @dgof_report,
+            @iroc_report, @verdict, @model, @signer, @signed_at, @pi_name, @proposal_title)
+  `).run(datos);
+  res.json({ ok: true, id: Number(info.lastInsertRowid) });
 });
 
-/* Genera y descarga el certificado en PDF. Guarda además una copia en
-   data/certificados/ como parte del récord de cumplimiento. */
+/* Genera y descarga el documento en PDF: certificado si el cotejo pasó,
+   informe de hallazgos si no. Archiva una copia en data/certificados/. */
 app.post("/api/certificado", async (req, res) => {
   try {
-    const { cotejo, descripcion, piName, proposalTitle, caseNo } = req.body;
-    if (!cotejo || !piName || !proposalTitle || !caseNo) {
-      return res.status(400).json({ error: "Faltan datos del certificado." });
+    const { cotejo, descripcion, piName, proposalTitle, findings } = req.body;
+    if (!cotejo || !piName || !proposalTitle) {
+      return res.status(400).json({ error: "Faltan datos del documento." });
     }
 
-    const nombre = nombreArchivo({ cotejo, caseNo, piName });
-    const doc = construirCertificado({ cotejo, descripcion, piName, proposalTitle, caseNo });
+    const esInforme = Array.isArray(findings) && findings.length > 0;
+    const nombre = nombreArchivo({
+      cotejo, piName, tipo: esInforme ? "Findings-Report" : "Certificado",
+    });
+    const doc = esInforme
+      ? construirInforme({ cotejo, piName, proposalTitle, findings })
+      : construirCertificado({ cotejo, descripcion, piName, proposalTitle });
 
     const trozos = [];
     doc.on("data", (c) => trozos.push(c));
@@ -220,7 +278,7 @@ app.post("/api/certificado", async (req, res) => {
         await fs.mkdir(CERT_DIR, { recursive: true });
         await fs.writeFile(path.join(CERT_DIR, nombre), pdf);
       } catch (e) {
-        console.error("No se pudo archivar el certificado:", e.message);
+        console.error("No se pudo archivar el documento:", e.message);
       }
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
@@ -234,12 +292,12 @@ app.post("/api/certificado", async (req, res) => {
 });
 
 app.get("/api/cases", (_req, res) => {
-  const rows = db.prepare("SELECT id, case_no, pi_name, proposal_title, file_name, verdict, model, signer, signed_at, created_at FROM cases ORDER BY created_at DESC").all();
+  const rows = db.prepare("SELECT id, pi_name, proposal_title, file_name, verdict, model, signer, signed_at, created_at FROM cases ORDER BY created_at DESC").all();
   res.json(rows);
 });
 
-app.get("/api/cases/:caseNo", (req, res) => {
-  const row = db.prepare("SELECT * FROM cases WHERE case_no = ?").get(req.params.caseNo);
+app.get("/api/cases/:id", (req, res) => {
+  const row = db.prepare("SELECT * FROM cases WHERE id = ?").get(Number(req.params.id));
   if (!row) return res.status(404).json({ error: "No encontrado" });
   res.json(row);
 });
