@@ -3,23 +3,26 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
-    "dev": "concurrently -n server,web -c blue,green \"node server/index.js\" \"vite\"",
-    "server": "node server/index.js",
+    "dev": "concurrently -n django,web -c blue,green \"npm run backend\" \"vite\"",
+    "backend": "uv run python backend/manage.py runserver 4000",
+    "server": "npm run backend",
+    "migrate": "uv run python backend/manage.py migrate",
+    "import:legacy": "uv run python backend/manage.py import_legacy_cases",
+    "test:backend": "uv run pytest",
     "build": "vite build",
-    "start": "node server/index.js"
+    "start": "uv run python backend/manage.py runserver 0.0.0.0:4000"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "multer": "^2.0.0",
-    "pdf-parse": "^1.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "^6.1.0",
     "concurrently": "^8.2.2",
-    "vite": "^5.4.1"
+    "vite": "^8.2.2"
   }
 }

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Decanato de Investigación — Agentes de IA · RCM-UPR</title>
+    <meta name="theme-color" content="#7A6A34" />
+    <meta
+      name="description"
+      content="Agentes de inteligencia artificial del Decanato de Investigación del RCM-UPR: cotejo preliminar de propuestas DEI, DGOF e IROC, expediente auditable y borradores de notificación."
+    />
+    <link rel="icon" href="/upr-rcm-logo.webp" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Oswald:wght@400;500;600&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap"
+    />
+    <link rel="stylesheet" href="/src/rcm.css" />
+    <script type="module" src="/src/nav.js"></script>
+    <script type="module" src="/src/launcher.js"></script>
+  </head>
+  <body>
+    <a class="saltar" href="#contenido">Saltar al contenido</a>
+
+    <div class="utility">
+      <div class="wrap">
+        <a href="https://rcm1.rcm.upr.edu/">Recinto de Ciencias Médicas</a>
+        <span class="sep">|</span>
+        <a href="http://upr.edu/">UPR</a>
+        <span class="sep">|</span>
+        <span>787-758-2525</span>
+        <span class="sep">|</span>
+        <span>Paseo Dr. José Celso Barbosa, San Juan, PR 00921</span>
+      </div>
+    </div>
+
+    <header class="masthead">
+      <div class="wrap">
+        <img
+          class="escudo"
+          alt="Sello del Recinto de Ciencias Médicas, Universidad de Puerto Rico"
+          src="/upr-rcm-logo.webp"
+          width="64"
+          height="64"
+          onerror="this.outerHTML='&lt;div class=&quot;escudo-fb&quot; aria-hidden=&quot;true&quot;&gt;RCM&lt;/div&gt;'"
+        />
+        <div class="titulos">
+          <div class="inst">Universidad de Puerto Rico · Recinto de Ciencias Médicas</div>
+          <div class="sitio"><a href="/">Agentes de <span>IA</span> para labores administrativas</a></div>
+        </div>
+        <div class="tag">Decanato de Investigación</div>
+      </div>
+    </header>
+
+    <nav class="mainnav" aria-label="Navegación principal">
+      <div class="wrap">
+        <button class="menubtn" type="button" aria-expanded="false" aria-controls="navlist">Menú</button>
+        <ul class="navlist" id="navlist">
+          <li><a href="/">Inicio</a></li>
+          <li>
+            <button type="button" aria-expanded="false">Decanatos</button>
+            <ul class="submenu">
+              <li>
+                <a href="/dec-invest.html" aria-current="page">
+                  Decanato de Investigación
+                  <small>3 cotejos disponibles</small>
+                </a>
+              </li>
+              <li>
+                <a href="#" aria-disabled="true">
+                  Decanato de Asuntos Académicos
+                  <small>Próximamente</small>
+                </a>
+              </li>
+              <li>
+                <a href="#" aria-disabled="true">
+                  Otros decanatos
+                  <small>Próximamente</small>
+                </a>
+              </li>
+            </ul>
+          </li>
+          <li><a href="https://rcm1.rcm.upr.edu/deanshipresearch/">Sitio del Decanato</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <nav class="migas" aria-label="Ruta de navegación">
+      <div class="wrap">
+        <a href="/">Inicio</a> › <span aria-current="page">Decanato de Investigación</span>
+      </div>
+    </nav>
+
+    <div class="hero">
+      <div class="wrap">
+        <div class="eyebrow">Decanato</div>
+        <h1>Decanato de <em>Investigación</em></h1>
+        <p class="bajada">
+          Aquí encuentras los agentes de inteligencia artificial que apoyan las labores administrativas del
+          Decanato: cotejo preliminar de propuestas, expediente auditable y borradores de notificación. Los
+          cotejos reducen el trabajo de lectura; la certificación siempre la firma una persona.
+        </p>
+      </div>
+    </div>
+
+    <main id="contenido">
+      <section>
+        <div class="wrap">
+          <h2 class="tituloseccion">Expediente de Cumplimiento — DGOF / IROC / DEI</h2>
+
+          <p style="max-width: 78ch; color: var(--gris); margin: 0 0 8px">
+            Tres cotejos independientes sobre el mismo documento, conforme a la política federal de julio de
+            2026 (EO&nbsp;14292 / NOT-OD-26-101). Cada cotejo abre en su propia ventana, reserva un número de
+            caso y guarda el expediente localmente. Cuando el resultado sale limpio, el ICDGOF firma la
+            certificación dentro de la aplicación y el sistema prepara el borrador de correo al PI.
+          </p>
+
+          <p class="estado-servicio">
+            <span class="punto" id="punto"></span>
+            <span id="estadoTexto">Conectando a LM Studio…</span>
+          </p>
+
+          <div class="rejilla" style="margin-top: 26px">
+            <a class="tarjeta-area" style="--acento: var(--oro-osc)" href="/dei.html" data-cotejo="cotejoDEI"
+              aria-label="Abrir el cotejo DEI: conteo y resaltado de términos">
+              <span class="tipo">Cotejo 01 · DEI</span>
+              <h3>Conteo y resaltado de términos</h3>
+              <p>
+                Cuenta y resalta términos de diversidad, equidad e inclusión dentro del texto de la propuesta,
+                con la lista de términos editable antes de correr. Es determinista: el mismo documento siempre
+                produce el mismo resultado, lo que hace el hallazgo auditable y repetible.
+              </p>
+              <span class="pie">Abrir cotejo →</span>
+            </a>
+
+            <a class="tarjeta-area" style="--acento: var(--rojo)" href="/dgof.html" data-cotejo="cotejoDGOF"
+              aria-label="Abrir el cotejo DGOF: ganancia de función peligrosa">
+              <span class="tipo">Cotejo 02 · DGOF</span>
+              <h3>Ganancia de función peligrosa</h3>
+              <p>
+                Evalúa la propuesta contra los siete resultados de ganancia de función peligrosa definidos en
+                la política federal, y devuelve una determinación con la evidencia textual que la sostiene, más
+                preguntas sugeridas para el PI cuando algo queda ambiguo. Está calibrado de forma conservadora:
+                ante la duda refiere a revisión humana en vez de dar paso.
+              </p>
+              <span class="pie">Abrir cotejo →</span>
+            </a>
+
+            <a class="tarjeta-area" style="--acento: var(--azul)" href="/iroc.html" data-cotejo="cotejoIROC"
+              aria-label="Abrir el cotejo IROC: investigación internacional de preocupación">
+              <span class="tipo">Cotejo 03 · IROC</span>
+              <h3>Investigación internacional de preocupación</h3>
+              <p>
+                Identifica sitios de investigación fuera de Estados Unidos, personal clave con afiliación
+                extranjera y posibles entidades de preocupación, separando lo que es hallazgo del texto de lo
+                que un revisor humano tiene que verificar contra la lista oficial. Puerto Rico y los demás
+                territorios no cuentan como jurisdicción extranjera.
+              </p>
+              <span class="pie">Abrir cotejo →</span>
+            </a>
+          </div>
+
+          <p style="margin-top: 24px">
+            <button class="btn" type="button" id="abrirTres">Abrir los tres a la vez</button>
+            <span
+              style="font-family: var(--mono); font-size: 11.5px; color: var(--gris); margin-left: 12px"
+            >Comparten un solo número de expediente</span>
+          </p>
+
+          <div class="aviso" id="aviso" hidden>
+            <b>Ventana bloqueada.</b> El navegador impidió abrir la ventana emergente. Permite las ventanas
+            emergentes para este sitio y vuelve a intentarlo, o abre el cotejo con clic derecho › Abrir enlace
+            en una pestaña nueva.
+          </div>
+
+          <p class="nota">
+            Prototipo. El cotejo automatizado es una ayuda de triaje: reduce el trabajo de lectura, no sustituye
+            la atestación del PI ni la certificación del ICDGOF, ambas bajo pena de ley. Ninguna determinación de
+            este sistema debe adjuntarse a una propuesta como evidencia de cumplimiento. Todo corre en esta
+            computadora — nada del texto de la propuesta sale de aquí.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <div class="cols">
+          <div>
+            <h4>Agentes de IA · RCM-UPR</h4>
+            <p style="margin: 0; max-width: 46ch">
+              Directorio institucional de aplicaciones y agentes de inteligencia artificial que apoyan las
+              labores administrativas del Recinto.
+            </p>
+          </div>
+          <div>
+            <h4>Enlaces</h4>
+            <ul>
+              <li><a href="/">Inicio del directorio</a></li>
+              <li><a href="https://rcm1.rcm.upr.edu/">Portal del RCM</a></li>
+              <li><a href="https://rcm1.rcm.upr.edu/deanshipresearch/">Decanato de Investigación</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="legal">
+          <p>© 2026 Universidad de Puerto Rico, Recinto de Ciencias Médicas.</p>
+          <p>
+            Las herramientas listadas asisten el trabajo administrativo; no sustituyen la revisión, la firma ni
+            la determinación de la persona responsable.
+          </p>
+          <p>
+            El RCM no discrimina por raza, religión, sexo, nacionalidad, edad, origen o condición social o
+            económica, impedimento físico o mental, ni afiliación política.
+          </p>
+          <p>
+            Website development, management and hosting by IIS: Integrated Informatics Systems Facility —
+            CCRHD Program. Development and hosting of this portal is partially supported by CCRHD grant
+            U54 MD007600 (NIMHD) from the National Institutes of Health. The content of this website is
+            solely the responsibility of the authors and does not necessarily represent the official views
+            of the National Institutes of Health.
+          </p>
+          <hr />
+          <p style="margin: 0">
+            The Medical Sciences Campus holds a Postsecondary Institutions Board Renewal License and is
+            accredited by the MSCHE (Middle States Commission on Higher Education). In addition, it does not
+            discriminate on the basis of race, religion, sex, nationality, age, origin or social or economic
+            condition, physical or mental disability, or political affiliation.
+          </p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

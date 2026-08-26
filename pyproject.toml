@@ -1,0 +1,27 @@
+[project]
+name = "dgof-iroc-screener-backend"
+version = "0.1.0"
+description = "Django backend for the DGOF / IROC compliance screener"
+requires-python = ">=3.12"
+dependencies = [
+  "dj-database-url>=2.3,<4",
+  "django>=5.2,<5.3",
+  "djangorestframework>=3.16,<4",
+  "httpx>=0.28,<1",
+  "psycopg[binary]>=3.2,<4",
+  "pypdf>=5.4,<7",
+  "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<10",
+  "pytest-django>=4.10,<5",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["backend"]
+testpaths = ["backend/screener/tests"]
+addopts = "-q"
+

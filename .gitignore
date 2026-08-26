@@ -1,6 +1,14 @@
 node_modules
 dist
 data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.sqlite3*
+*.sqlite3
 data/uploads/*
 !data/uploads/.gitkeep
 .env
+.venv
+__pycache__
+.pytest_cache
+*.py[cod]

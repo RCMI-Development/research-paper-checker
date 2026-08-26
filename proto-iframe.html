@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Expediente de Cumplimiento — RCM (prototipo iframe)</title>
+    <style>
+      /* Prototipo: conserva sus propios nombres de token, con los valores
+         de la paleta institucional (src/rcm.css). Sin esto el cotejo que
+         se monta adentro va en oro RCM y la página anfitriona en gris. */
+      :root {
+        --paper: #F6F4EC;
+        --card: #FFFFFF;
+        --rule: #DCDACE;
+        --ink: #22262B;
+        --soft: #5B6169;
+        --blue: #2E3A8C;
+        --red: #A8202A;
+        --amber: #7A6A34;
+        --tint: #EFE9D8;
+        --display: 'Oswald', 'Arial Narrow', sans-serif;
+        --body: 'Source Sans 3', 'Segoe UI', Helvetica, Arial, sans-serif;
+        --mono: 'IBM Plex Mono', 'Courier New', monospace;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--paper); color: var(--ink);
+        font-family: var(--body); min-height: 100vh;
+      }
+      body.locked { overflow: hidden; }
+      .wrap { max-width: 940px; margin: 0 auto; padding: 34px 20px 70px; }
+
+      header { border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 28px; }
+      .eyebrow {
+        font-family: var(--display); font-size: 12px; letter-spacing: .16em;
+        text-transform: uppercase; color: var(--soft); font-weight: 600;
+      }
+      h1 {
+        font-family: var(--display); font-size: 44px; font-weight: 700; margin: 3px 0 0;
+        letter-spacing: .02em; text-transform: uppercase; line-height: 1;
+      }
+      .blurb { font-size: 15px; margin: 12px 0 0; max-width: 660px; color: var(--soft); line-height: 1.55; }
+
+      .status {
+        margin-top: 16px; font-family: var(--mono); font-size: 11.5px; color: var(--soft);
+        display: flex; align-items: center; gap: 7px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 8px; background: var(--rule); flex-shrink: 0; }
+      .dot.on { background: var(--blue); }
+      .dot.off { background: var(--red); }
+
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+      .tile {
+        background: var(--card); border: 1px solid var(--rule); border-left: 4px solid var(--accent, var(--rule));
+        padding: 20px 18px; text-align: left; cursor: pointer; display: flex; flex-direction: column;
+        min-height: 236px; font-family: var(--body); color: var(--ink);
+      }
+      .tile:hover { background: #fff; border-color: var(--accent, var(--rule)); }
+      .tile:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+      .tile .num { font-family: var(--mono); font-size: 10px; color: var(--soft); letter-spacing: .12em; }
+      .tile h2 {
+        font-family: var(--display); font-size: 26px; text-transform: uppercase; letter-spacing: .04em;
+        margin: 5px 0 8px; font-weight: 700; color: var(--accent);
+      }
+      .tile p { font-size: 13.5px; line-height: 1.55; color: var(--soft); margin: 0 0 14px; flex: 1; }
+      .tile .meta {
+        font-family: var(--mono); font-size: 10.5px; color: var(--soft);
+        border-top: 1px dashed var(--rule); padding-top: 9px; margin-bottom: 12px;
+      }
+      .tile .cta {
+        font-family: var(--display); font-size: 13px; text-transform: uppercase; letter-spacing: .1em;
+        font-weight: 600; color: var(--ink);
+      }
+      .tile:hover .cta { color: var(--accent); }
+
+      .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 22px; }
+      .btn {
+        font-family: var(--display); text-transform: uppercase; letter-spacing: .1em; font-weight: 600;
+        font-size: 13px; padding: 10px 18px; border: 1.5px solid var(--ink);
+        background: transparent; color: var(--ink); cursor: pointer;
+      }
+      .btn:hover { background: var(--ink); color: var(--card); }
+
+      .note {
+        font-size: 12.5px; color: var(--soft); line-height: 1.65;
+        margin-top: 26px; border-top: 1px solid var(--rule); padding-top: 14px;
+      }
+
+      /* ── expediente en pantalla: sobrecapa, no ventana ── */
+      .backdrop {
+        position: fixed; inset: 0; background: rgba(22, 24, 28, .55);
+        display: none; align-items: center; justify-content: center; padding: 24px; z-index: 50;
+      }
+      .backdrop.open { display: flex; }
+      .panel {
+        background: var(--paper); border: 1px solid var(--ink);
+        box-shadow: 0 24px 60px rgba(22, 24, 28, .35);
+        width: min(1040px, 100%); height: min(940px, 100%);
+        display: flex; flex-direction: column;
+      }
+      .panelbar {
+        display: flex; align-items: stretch; gap: 0; flex-shrink: 0;
+        background: var(--card); border-bottom: 1px solid var(--ink);
+      }
+      .tab {
+        font-family: var(--display); text-transform: uppercase; letter-spacing: .1em; font-weight: 600;
+        font-size: 13px; padding: 12px 20px; border: 0; border-right: 1px solid var(--rule);
+        background: transparent; color: var(--soft); cursor: pointer;
+      }
+      .tab:hover { color: var(--ink); }
+      .tab[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: inset 0 -3px 0 var(--accent, var(--ink)); }
+      .panelbar .caseno {
+        font-family: var(--mono); font-size: 11px; color: var(--soft);
+        display: flex; align-items: center; padding: 0 14px; margin-left: auto;
+      }
+      .close {
+        font-family: var(--display); font-size: 18px; line-height: 1; padding: 0 18px;
+        border: 0; border-left: 1px solid var(--rule); background: transparent;
+        color: var(--soft); cursor: pointer;
+      }
+      .close:hover { background: var(--red); color: var(--card); }
+      .frames { position: relative; flex: 1; min-height: 0; }
+      .frames iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; background: var(--paper); }
+      .frames iframe.active { display: block; }
+    </style>
+    <link rel="icon" href="/upr-rcm-logo.webp" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Oswald:wght@400;500;600&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap"
+    />
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="eyebrow">Recinto de Ciencias Médicas · Decanato de Investigación</div>
+        <h1>Expediente de cumplimiento</h1>
+        <p class="blurb">
+          Cotejo preliminar de propuestas conforme a la política federal de julio de 2026 (EO&nbsp;14292).
+          Cada cotejo abre sobre esta misma página. El resultado es un documento de trabajo:
+          la certificación la firma una persona.
+        </p>
+        <div class="status">
+          <span class="dot" id="dot"></span>
+          <span id="statusText">Conectando a LM Studio…</span>
+        </div>
+      </header>
+
+      <div class="grid">
+        <button class="tile" style="--accent: var(--amber)" data-key="dei" data-page="dei.html">
+          <span class="num">COTEJO 01</span>
+          <h2>DEI</h2>
+          <p>
+            Cuenta y resalta términos de diversidad, equidad e inclusión en el documento.
+            Determinista: el mismo texto siempre da el mismo resultado.
+          </p>
+          <div class="meta">Local · no usa modelo · instantáneo</div>
+          <span class="cta">Abrir cotejo →</span>
+        </button>
+
+        <button class="tile" style="--accent: var(--red)" data-key="dgof" data-page="dgof.html">
+          <span class="num">COTEJO 02</span>
+          <h2>DGOF</h2>
+          <p>
+            Evalúa la propuesta contra los siete resultados de ganancia de función peligrosa
+            y emite determinación con evidencia del texto.
+          </p>
+          <div class="meta">Requiere LM Studio · emite certificado</div>
+          <span class="cta">Abrir cotejo →</span>
+        </button>
+
+        <button class="tile" style="--accent: var(--blue)" data-key="iroc" data-page="iroc.html">
+          <span class="num">COTEJO 03</span>
+          <h2>IROC</h2>
+          <p>
+            Identifica sitios fuera de EE.&nbsp;UU., personal clave con afiliación extranjera
+            y posibles entidades de preocupación.
+          </p>
+          <div class="meta">Requiere LM Studio · emite certificado</div>
+          <span class="cta">Abrir cotejo →</span>
+        </button>
+      </div>
+
+      <div class="row">
+        <button class="btn" id="openAll">Abrir los tres a la vez</button>
+      </div>
+
+      <p class="note">
+        Prototipo. El cotejo automatizado es una ayuda de triaje: reduce el trabajo de lectura, no
+        sustituye la atestación del PI ni la certificación del ICDGOF, ambas bajo pena de ley.
+        Ninguna determinación de este sistema debe adjuntarse a una propuesta como evidencia de
+        cumplimiento. Todo corre en esta computadora — nada del texto de la propuesta sale de aquí.
+      </p>
+    </div>
+
+    <div class="backdrop" id="backdrop" role="dialog" aria-modal="true" aria-label="Cotejo">
+      <div class="panel">
+        <div class="panelbar" id="panelbar" role="tablist">
+          <span class="caseno" id="panelCase"></span>
+          <button class="close" id="closeBtn" aria-label="Cerrar cotejo">✕</button>
+        </div>
+        <div class="frames" id="frames"></div>
+      </div>
+    </div>
+
+    <script>
+      const PAGES = {
+        dei:  { page: "dei.html",  label: "DEI",  accent: "var(--amber)" },
+        dgof: { page: "dgof.html", label: "DGOF", accent: "var(--red)" },
+        iroc: { page: "iroc.html", label: "IROC", accent: "var(--blue)" },
+      };
+
+      const backdrop = document.getElementById("backdrop");
+      const panelbar = document.getElementById("panelbar");
+      const framesEl = document.getElementById("frames");
+      const panelCase = document.getElementById("panelCase");
+      const closeBtn = document.getElementById("closeBtn");
+      const caseLabel = document.getElementById("panelCase");
+
+      let lastFocus = null;
+
+      /* Cada cotejo vive en su propio iframe: se monta una vez y se
+         mantiene vivo al cambiar de pestaña, para no perder el trabajo. */
+      function openPanel(keys, caseNo) {
+        lastFocus = document.activeElement;
+        panelbar.querySelectorAll(".tab").forEach((t) => t.remove());
+        framesEl.replaceChildren();
+
+        keys.forEach((key, i) => {
+          const { page, label, accent } = PAGES[key];
+          const tab = document.createElement("button");
+          tab.className = "tab";
+          tab.type = "button";
+          tab.role = "tab";
+          tab.textContent = label;
+          tab.style.setProperty("--accent", accent);
+          tab.dataset.key = key;
+          tab.setAttribute("aria-selected", String(i === 0));
+          tab.addEventListener("click", () => selectTab(key));
+          panelbar.insertBefore(tab, caseLabel);
+
+          const frame = document.createElement("iframe");
+          frame.src = caseNo ? `${page}?caseNo=${encodeURIComponent(caseNo)}` : page;
+          frame.title = `Cotejo ${label}`;
+          frame.dataset.key = key;
+          frame.classList.toggle("active", i === 0);
+          framesEl.append(frame);
+        });
+
+        panelCase.textContent = caseNo || "";
+        backdrop.classList.add("open");
+        document.body.classList.add("locked");
+        closeBtn.focus();
+      }
+
+      function selectTab(key) {
+        panelbar.querySelectorAll(".tab").forEach((t) =>
+          t.setAttribute("aria-selected", String(t.dataset.key === key)));
+        framesEl.querySelectorAll("iframe").forEach((f) =>
+          f.classList.toggle("active", f.dataset.key === key));
+      }
+
+      function closePanel() {
+        backdrop.classList.remove("open");
+        document.body.classList.remove("locked");
+        framesEl.replaceChildren();
+        lastFocus?.focus();
+      }
+
+      closeBtn.addEventListener("click", closePanel);
+      backdrop.addEventListener("mousedown", (e) => { if (e.target === backdrop) closePanel(); });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && backdrop.classList.contains("open")) closePanel();
+      });
+
+      /* El botón "Cerrar" dentro del cotejo ya no puede usar window.close(). */
+      window.addEventListener("message", (e) => {
+        if (e.origin !== window.location.origin) return;
+        if (e.data?.type === "cotejo:close") closePanel();
+      });
+
+      document.querySelectorAll(".tile").forEach((tile) => {
+        tile.addEventListener("click", () => openPanel([tile.dataset.key], null));
+      });
+
+      document.getElementById("openAll").addEventListener("click", async () => {
+        const r = await fetch("/api/case-number");
+        if (!r.ok) return;
+        const { caseNo } = await r.json();
+        openPanel(["dei", "dgof", "iroc"], caseNo);
+      });
+
+      fetch("/api/health")
+        .then((r) => r.json())
+        .then((h) => {
+          const dot = document.getElementById("dot");
+          const txt = document.getElementById("statusText");
+          if (h.reachable) {
+            dot.className = "dot on";
+            txt.textContent = `LM Studio en línea (localhost:1234) · modelo: ${h.defaultModel}`;
+          } else {
+            dot.className = "dot off";
+            txt.textContent = "LM Studio no disponible — préndelo en Developer › Local Server. El cotejo DEI funciona igual.";
+          }
+        })
+        .catch(() => {
+          document.getElementById("dot").className = "dot off";
+          document.getElementById("statusText").textContent =
+            "No se pudo contactar el servidor local — ¿corriste npm run dev?";
+        });
+    </script>
+  </body>
+</html>
