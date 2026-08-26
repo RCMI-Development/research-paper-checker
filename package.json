@@ -4,16 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n server,web -c blue,green \"node server/index.js\" \"vite\"",
-    "server": "node server/index.js",
     "build": "vite build",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "setup": "npm install && npm run build",
+    "dev": "concurrently -n server,web -c blue,green \"node server/index.js\" \"vite\""
   },
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "multer": "^2.0.0",
     "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.20.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

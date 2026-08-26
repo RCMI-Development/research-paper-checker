@@ -17,10 +17,11 @@ Return ONLY compact JSON, no prose, no markdown:
 {"determination":"none|potential|likely|insufficient",
  "agents":["biological agents named, [] if none"],
  "in_silico_only":true|false,
- "outcomes":[{"n":1-7,"evidence":"under 12 words from the text","note":"one sentence"}],
- "rationale":"2 sentences max",
+ "outcomes":[{"n":1-7,"evidence":"under 12 words quoted from the text","note":"one sentence"}],
+ "rationale":"one sentence",
  "ask_pi":["question for the PI"]}
-Include outcomes only where there is real textual basis. Keep total output under 700 tokens.`;
+Include outcomes only where there is real textual basis, and every outcome MUST quote the exact words
+from the proposal in "evidence". Keep total output under 700 tokens.`;
 
 export const IROC_PROMPT = `You screen federal research proposals for International Research of Concern (IROC) under the USG Policy for Stopping High-Risk Life Sciences Research (July 2026).
 
@@ -32,8 +33,9 @@ You are a screening aid, not a certifier. Identify what a human reviewer must ve
 
 Return ONLY compact JSON, no prose, no markdown:
 {"determination":"none|review_needed|prohibited_risk|insufficient",
- "foreign_sites":[{"country":"","entity":"","role":"one phrase"}],
- "collaborators":[{"name":"","affiliation":"","country":""}],
- "rationale":"2 sentences max",
+ "foreign_sites":[{"country":"","entity":"","role":"one phrase","evidence":"under 12 words quoted from the text"}],
+ "collaborators":[{"name":"","affiliation":"","country":"","evidence":"under 12 words quoted from the text"}],
+ "rationale":"one sentence",
  "ask_pi":["question for the PI"]}
+Every finding MUST carry an "evidence" field quoting the exact words from the proposal that support it.
 Empty arrays when nothing is found. Keep total output under 700 tokens.`;

@@ -3,10 +3,218 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Expediente de Cumplimiento — DGOF / IROC / DEI</title>
+    <title>Expediente de Cumplimiento — RCM</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+      :root {
+        --paper: #E5E7E0;
+        --card: #FAFAF7;
+        --rule: #C3C6BC;
+        --ink: #16181C;
+        --soft: #5C6068;
+        --blue: #2E3A8C;
+        --red: #A8202A;
+        --amber: #9A6B0F;
+        --tint: #EDEFE7;
+        --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+        --body: 'Source Serif 4', Georgia, serif;
+        --mono: 'IBM Plex Mono', 'Courier New', monospace;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--paper); color: var(--ink);
+        font-family: var(--body); min-height: 100vh;
+      }
+      .wrap { max-width: 940px; margin: 0 auto; padding: 34px 20px 70px; }
+
+      header { border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 28px; }
+      .eyebrow {
+        font-family: var(--display); font-size: 12px; letter-spacing: .16em;
+        text-transform: uppercase; color: var(--soft); font-weight: 600;
+      }
+      h1 {
+        font-family: var(--display); font-size: 44px; font-weight: 700; margin: 3px 0 0;
+        letter-spacing: .02em; text-transform: uppercase; line-height: 1;
+      }
+      .blurb { font-size: 15px; margin: 12px 0 0; max-width: 660px; color: var(--soft); line-height: 1.55; }
+
+      .status {
+        margin-top: 16px; font-family: var(--mono); font-size: 11.5px; color: var(--soft);
+        display: flex; align-items: center; gap: 7px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 8px; background: var(--rule); flex-shrink: 0; }
+      .dot.on { background: var(--blue); }
+      .dot.off { background: var(--red); }
+
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+      .tile {
+        background: var(--card); border: 1px solid var(--rule); border-left: 4px solid var(--accent, var(--rule));
+        padding: 20px 18px; text-align: left; cursor: pointer; display: flex; flex-direction: column;
+        min-height: 236px; font-family: var(--body); color: var(--ink);
+      }
+      .tile:hover { background: #fff; border-color: var(--accent, var(--rule)); }
+      .tile:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+      .tile .num { font-family: var(--mono); font-size: 10px; color: var(--soft); letter-spacing: .12em; }
+      .tile h2 {
+        font-family: var(--display); font-size: 26px; text-transform: uppercase; letter-spacing: .04em;
+        margin: 5px 0 8px; font-weight: 700; color: var(--accent);
+      }
+      .tile p { font-size: 13.5px; line-height: 1.55; color: var(--soft); margin: 0 0 14px; flex: 1; }
+      .tile .meta {
+        font-family: var(--mono); font-size: 10.5px; color: var(--soft);
+        border-top: 1px dashed var(--rule); padding-top: 9px; margin-bottom: 12px;
+      }
+      .tile .cta {
+        font-family: var(--display); font-size: 13px; text-transform: uppercase; letter-spacing: .1em;
+        font-weight: 600; color: var(--ink);
+      }
+      .tile:hover .cta { color: var(--accent); }
+
+      .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 22px; }
+      .btn {
+        font-family: var(--display); text-transform: uppercase; letter-spacing: .1em; font-weight: 600;
+        font-size: 13px; padding: 10px 18px; border: 1.5px solid var(--ink);
+        background: transparent; color: var(--ink); cursor: pointer;
+      }
+      .btn:hover { background: var(--ink); color: var(--card); }
+
+      .note {
+        font-size: 12.5px; color: var(--soft); line-height: 1.65;
+        margin-top: 26px; border-top: 1px solid var(--rule); padding-top: 14px;
+      }
+      .warn {
+        display: none; margin-top: 14px; padding: 12px 14px; background: var(--tint);
+        border: 1px dashed var(--amber); color: var(--amber); font-size: 13.5px; line-height: 1.55;
+      }
+      .warn.show { display: block; }
+      .warn a { color: var(--amber); }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <div class="wrap">
+      <header>
+        <div class="eyebrow">Recinto de Ciencias Médicas · Decanato de Investigación</div>
+        <h1>Expediente de cumplimiento</h1>
+        <p class="blurb">
+          Cotejo preliminar de propuestas conforme a la política federal de julio de 2026 (EO&nbsp;14292).
+          Cada cotejo abre en su propia ventana y funciona por separado. Si la propuesta pasa, el
+          investigador emite y descarga su certificado ahí mismo.
+        </p>
+        <div class="status">
+          <span class="dot" id="dot"></span>
+          <span id="statusText">Conectando a LM Studio…</span>
+        </div>
+      </header>
+
+      <div class="grid">
+        <button class="tile" style="--accent: var(--amber)" data-page="dei.html" data-name="cotejoDEI">
+          <span class="num">COTEJO 01</span>
+          <h2>DEI</h2>
+          <p>
+            Cuenta y ubica términos de diversidad, equidad e inclusión, citando dónde
+            aparecen. Determinista: el mismo documento siempre da el mismo resultado.
+          </p>
+          <div class="meta">Local · no usa modelo · emite certificado</div>
+          <span class="cta">Abrir ventana →</span>
+        </button>
+
+        <button class="tile" style="--accent: var(--red)" data-page="dgof.html" data-name="cotejoDGOF">
+          <span class="num">COTEJO 02</span>
+          <h2>DGOF</h2>
+          <p>
+            Evalúa la propuesta contra los siete resultados de ganancia de función
+            peligrosa, citando la evidencia del texto.
+          </p>
+          <div class="meta">Requiere LM Studio · emite certificado</div>
+          <span class="cta">Abrir ventana →</span>
+        </button>
+
+        <button class="tile" style="--accent: var(--blue)" data-page="iroc.html" data-name="cotejoIROC">
+          <span class="num">COTEJO 03</span>
+          <h2>IROC</h2>
+          <p>
+            Identifica sitios fuera de EE.&nbsp;UU. y personal clave con afiliación
+            extranjera, citando la evidencia del texto.
+          </p>
+          <div class="meta">Requiere LM Studio · emite certificado</div>
+          <span class="cta">Abrir ventana →</span>
+        </button>
+      </div>
+
+      <div class="row">
+        <button class="btn" id="openAll">Abrir los tres a la vez</button>
+      </div>
+
+      <div class="warn" id="warn">
+        El navegador bloqueó la ventana emergente. Permite las ventanas emergentes para
+        <code id="warnHost">este sitio</code> y vuelve a intentarlo.
+      </div>
+
+      <p class="note">
+        Prototipo. El cotejo automatizado es una ayuda de triaje: reduce el trabajo de lectura, no
+        sustituye la atestación del PI ni la certificación del ICDGOF, ambas bajo pena de ley.
+        Ninguna determinación de este sistema debe adjuntarse a una propuesta como evidencia de
+        cumplimiento. Todo corre en esta computadora — nada del texto de la propuesta sale de aquí.
+      </p>
+    </div>
+
+    <script>
+      document.getElementById("warnHost").textContent = location.host;
+      const open = new Map();
+
+      function openPopup(page, name, offset = 0) {
+        const existing = open.get(name);
+        if (existing && !existing.closed) { existing.focus(); return true; }
+
+        const w = 1040, h = Math.min(940, screen.availHeight - 80);
+        const left = Math.max(0, (screen.availWidth - w) / 2 + offset * 34);
+        const top = Math.max(0, (screen.availHeight - h) / 2 + offset * 34);
+        const win = window.open(
+          page, name,
+          `popup=yes,width=${w},height=${h},left=${Math.round(left)},top=${Math.round(top)},resizable=yes,scrollbars=yes`
+        );
+        if (win) { open.set(name, win); win.focus(); return true; }
+        return false;
+      }
+
+      document.querySelectorAll(".tile").forEach((tile) => {
+        tile.addEventListener("click", () => {
+          const ok = openPopup(tile.dataset.page, tile.dataset.name);
+          document.getElementById("warn").classList.toggle("show", !ok);
+        });
+      });
+
+      document.getElementById("openAll").addEventListener("click", () => {
+        const tiles = [...document.querySelectorAll(".tile")];
+        const results = tiles.map((t, i) => openPopup(t.dataset.page, t.dataset.name, i));
+        document.getElementById("warn").classList.toggle("show", results.some((r) => !r));
+      });
+
+      fetch("/api/health")
+        .then((r) => r.json())
+        .then((h) => {
+          const dot = document.getElementById("dot");
+          const txt = document.getElementById("statusText");
+          if (h.reachable && h.loaded === false) {
+            dot.className = "dot off";
+            txt.textContent = `LM Studio en línea, pero ${h.model} no está cargado. El cotejo DEI funciona igual.`;
+          } else if (h.reachable) {
+            dot.className = "dot on";
+            txt.textContent = `LM Studio en línea (localhost:1234) · modelo: ${h.model}`;
+          } else {
+            dot.className = "dot off";
+            txt.textContent = "LM Studio no disponible — préndelo en Developer › Local Server. El cotejo DEI funciona igual.";
+          }
+        })
+        .catch(() => {
+          document.getElementById("dot").className = "dot off";
+          document.getElementById("statusText").textContent =
+            "No se pudo contactar el servidor local — ¿corriste npm run dev?";
+        });
+    </script>
   </body>
 </html>
