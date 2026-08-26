@@ -1,6 +1,8 @@
 node_modules
 dist
-data/*.db
+data/cases.db*
 data/uploads/*
 !data/uploads/.gitkeep
+data/certificados/*
 .env
+.DS_Store
