@@ -1,8 +1,11 @@
 {
-  "name": "dgof-iroc-screener",
+  "name": "research-paper-checker",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "concurrently -n server,web -c blue,green \"node server/index.js\" \"vite\"",
     "server": "node server/index.js",
