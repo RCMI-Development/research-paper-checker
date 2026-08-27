@@ -117,11 +117,16 @@
         display: flex; align-items: center; padding: 0 14px; margin-left: auto;
       }
       .close {
-        font-family: var(--display); font-size: 18px; line-height: 1; padding: 0 18px;
+        flex: 0 0 auto; width: 46px;
+        display: grid; place-items: center;
         border: 0; border-left: 1px solid var(--rule); background: transparent;
         color: var(--soft); cursor: pointer;
+        transition: background .15s, color .15s, box-shadow .15s;
       }
-      .close:hover { background: var(--red); color: var(--card); }
+      .close svg { display: block; width: 13px; height: 13px; shape-rendering: geometricPrecision; }
+      .close:hover { background: var(--paper); color: var(--red); box-shadow: inset 0 -3px 0 var(--red); }
+      .close:active { background: var(--red); color: var(--card); box-shadow: none; }
+      .close:focus-visible { outline-offset: -3px; }
       .frames { position: relative; flex: 1; min-height: 0; }
       .frames iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; background: var(--paper); }
       .frames iframe.active { display: block; }
@@ -201,7 +206,12 @@
       <div class="panel">
         <div class="panelbar" id="panelbar" role="tablist">
           <span class="caseno" id="panelCase"></span>
-          <button class="close" id="closeBtn" aria-label="Cerrar cotejo">✕</button>
+          <button class="close" id="closeBtn" type="button" title="Cerrar cotejo" aria-label="Cerrar cotejo">
+            <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+              <path d="M1.5 1.5 12.5 12.5M12.5 1.5 1.5 12.5" fill="none"
+                stroke="currentColor" stroke-width="1.5" stroke-linecap="square" />
+            </svg>
+          </button>
         </div>
         <div class="frames" id="frames"></div>
       </div>

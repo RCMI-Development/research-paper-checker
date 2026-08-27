@@ -47,12 +47,26 @@ body.locked { overflow: hidden; }
   box-shadow: inset 0 -3px 0 var(--accent, var(--tinta));
 }
 
+/* El cierre es la única salida del expediente —no hay Escape ni clic
+   fuera—, así que tiene que leerse como parte de la barra y no como un
+   glifo pegado encima. La ✕ es un trazo SVG, no el carácter U+2715:
+   Oswald no lo trae, el glifo caía a una tipografía de reserva y entraba
+   con otro peso y otro centro óptico que el resto de la barra. */
 .close {
-  font-family: var(--display); font-size: 18px; line-height: 1; padding: 0 18px;
+  flex: 0 0 auto; width: 46px;
+  display: grid; place-items: center;
   border: 0; border-left: 1px solid var(--linea); background: transparent;
   color: var(--gris); cursor: pointer;
+  transition: background .15s, color .15s, box-shadow .15s;
 }
-.close:hover { background: var(--rojo); color: var(--blanco); }
+.close svg { display: block; width: 13px; height: 13px; shape-rendering: geometricPrecision; }
+/* El mismo lenguaje que la pestaña activa —fondo crema y filete inferior—
+   en lugar de inundar el botón de rojo al pasar por encima. El rojo pleno
+   se reserva para el pulsado, que sí es el momento de decidir. */
+.close:hover { background: var(--crema); color: var(--rojo); box-shadow: inset 0 -3px 0 var(--rojo); }
+.close:active { background: var(--rojo); color: var(--blanco); box-shadow: none; }
+/* El outline global se dibuja 2 px por fuera y la barra se lo come. */
+.close:focus-visible { outline-offset: -3px; }
 
 /* Las pestañas inactivas se esconden, no se desmontan: cambiar de cotejo
    no puede botar el PDF ya cargado ni una corrida a medio camino. */

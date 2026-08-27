@@ -97,7 +97,13 @@ export function Panel({ keys, caseNo, onClose }) {
             );
           })}
           <span className="caseno">{caseNo || ""}</span>
-          <button className="close" ref={closeRef} aria-label="Cerrar cotejo" onClick={onClose}>✕</button>
+          <button className="close" type="button" ref={closeRef}
+            title="Cerrar cotejo" aria-label="Cerrar cotejo" onClick={onClose}>
+            <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+              <path d="M1.5 1.5 12.5 12.5M12.5 1.5 1.5 12.5" fill="none"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
+            </svg>
+          </button>
         </div>
         <div className="frames">
           {keys.map((key) => {
