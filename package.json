@@ -3,11 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "build": "vite build",
     "start": "node server/index.js",
-    "setup": "npm install && npm run build",
-    "dev": "concurrently -n server,web -c blue,green \"node server/index.js\" \"vite\""
+    "setup": "bash scripts/setup.sh",
+    "dev": "concurrently -n server,web -c blue,green \"node server/index.js\" \"vite\"",
+    "status": "bash scripts/status.sh",
+    "start:dev": "bash scripts/start.sh"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
