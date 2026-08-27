@@ -1,0 +1,61 @@
+/* ─────────────────────────────────────────────────────────────
+   Sobrecapa de cotejo.
+
+   El cotejo abre sobre la página que lo lanzó, no en una ventana
+   emergente del sistema: nada de window.open, nada que el bloqueador
+   del navegador pueda impedir, y el expediente nunca se pierde detrás
+   de otra ventana.
+
+   Tokens: los de src/rcm.css, que es la copia autoritativa. Esta hoja
+   entra por import desde src/panel.jsx, así que la reciben por igual
+   la página del Decanato y el prototipo.
+   ───────────────────────────────────────────────────────────── */
+
+/* Sin esto la página de atrás sigue haciendo scroll debajo del cotejo. */
+body.locked { overflow: hidden; }
+
+.backdrop {
+  position: fixed; inset: 0; background: rgba(34, 38, 43, .55);
+  display: none; align-items: center; justify-content: center; padding: 24px; z-index: 50;
+}
+.backdrop.open { display: flex; }
+
+.panel {
+  background: var(--crema); border: 1px solid var(--tinta);
+  box-shadow: 0 24px 60px rgba(34, 38, 43, .35);
+  width: min(1040px, 100%); height: min(940px, 100%);
+  display: flex; flex-direction: column;
+}
+
+.panelbar {
+  display: flex; align-items: stretch; gap: 0; flex-shrink: 0;
+  background: var(--blanco); border-bottom: 1px solid var(--tinta);
+}
+.panelbar .caseno {
+  font-family: var(--mono); font-size: 11px; color: var(--gris);
+  display: flex; align-items: center; padding: 0 14px; margin-left: auto;
+}
+
+.tab {
+  font-family: var(--display); text-transform: uppercase; letter-spacing: .1em; font-weight: 600;
+  font-size: 13px; padding: 12px 20px; border: 0; border-right: 1px solid var(--linea);
+  background: transparent; color: var(--gris); cursor: pointer;
+}
+.tab:hover { color: var(--tinta); }
+.tab[aria-selected="true"] {
+  background: var(--crema); color: var(--tinta);
+  box-shadow: inset 0 -3px 0 var(--accent, var(--tinta));
+}
+
+.close {
+  font-family: var(--display); font-size: 18px; line-height: 1; padding: 0 18px;
+  border: 0; border-left: 1px solid var(--linea); background: transparent;
+  color: var(--gris); cursor: pointer;
+}
+.close:hover { background: var(--rojo); color: var(--blanco); }
+
+/* Las pestañas inactivas se esconden, no se desmontan: cambiar de cotejo
+   no puede botar el PDF ya cargado ni una corrida a medio camino. */
+.frames { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.frames > div { position: absolute; inset: 0; overflow-y: auto; display: none; }
+.frames > div.active { display: block; }

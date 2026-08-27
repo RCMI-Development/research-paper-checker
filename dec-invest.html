@@ -18,7 +18,7 @@
     />
     <link rel="stylesheet" href="/src/rcm.css" />
     <script type="module" src="/src/nav.js"></script>
-    <script type="module" src="/src/launcher.js"></script>
+    <script type="module" src="/src/dec-invest.jsx"></script>
   </head>
   <body>
     <a class="saltar" href="#contenido">Saltar al contenido</a>
@@ -111,9 +111,10 @@
 
           <p style="max-width: 78ch; color: var(--gris); margin: 0 0 8px">
             Tres cotejos independientes sobre el mismo documento, conforme a la política federal de julio de
-            2026 (EO&nbsp;14292 / NOT-OD-26-101). Cada cotejo abre en su propia ventana, reserva un número de
-            caso y guarda el expediente localmente. Cuando el resultado sale limpio, el ICDGOF firma la
-            certificación dentro de la aplicación y el sistema prepara el borrador de correo al PI.
+            2026 (EO&nbsp;14292 / NOT-OD-26-101). Cada cotejo abre sobre esta misma página, reserva un número
+            de caso y guarda el expediente localmente; se cierra con la ✕ o con «Cerrar cotejo». Cuando el
+            resultado sale limpio, el ICDGOF firma la certificación dentro de la aplicación y el sistema
+            prepara el borrador de correo al PI.
           </p>
 
           <p class="estado-servicio">
@@ -168,11 +169,8 @@
             >Comparten un solo número de expediente</span>
           </p>
 
-          <div class="aviso" id="aviso" hidden>
-            <b>Ventana bloqueada.</b> El navegador impidió abrir la ventana emergente. Permite las ventanas
-            emergentes para este sitio y vuelve a intentarlo, o abre el cotejo con clic derecho › Abrir enlace
-            en una pestaña nueva.
-          </div>
+          <!-- Lo llena src/dec-invest.jsx cuando algo falla; ya no hay ventanas que bloquear. -->
+          <div class="aviso" id="aviso" hidden></div>
 
           <p class="nota">
             Prototipo. El cotejo automatizado es una ayuda de triaje: reduce el trabajo de lectura, no sustituye
@@ -230,5 +228,8 @@
         </div>
       </div>
     </footer>
+
+    <!-- La sobrecapa del cotejo se monta aquí, sobre la página. -->
+    <div id="cotejo"></div>
   </body>
 </html>

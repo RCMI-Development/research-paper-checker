@@ -1,31 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
-import { DeiPage } from "./dei.jsx";
-import { DgofPage } from "./dgof.jsx";
-import { IrocPage } from "./iroc.jsx";
+import { COTEJOS, Panel } from "./panel.jsx";
 
-/* Prototipo B: los tres cotejos viven en esta misma página. No hay
-   ventanas emergentes ni iframes — cada cotejo es un componente que se
-   monta dentro de la sobrecapa y se mantiene montado al cambiar de
-   pestaña, para que no se pierda el trabajo a medio hacer. */
-
-const COTEJOS = [
-  {
-    key: "dei", label: "DEI", num: "COTEJO 01", accent: "var(--amber)", Page: DeiPage,
-    blurb: "Cuenta y resalta términos de diversidad, equidad e inclusión en el documento. Determinista: el mismo texto siempre da el mismo resultado.",
-    meta: "Local · no usa modelo · instantáneo",
-  },
-  {
-    key: "dgof", label: "DGOF", num: "COTEJO 02", accent: "var(--red)", Page: DgofPage,
-    blurb: "Evalúa la propuesta contra los siete resultados de ganancia de función peligrosa y emite determinación con evidencia del texto.",
-    meta: "Requiere LM Studio · emite certificado",
-  },
-  {
-    key: "iroc", label: "IROC", num: "COTEJO 03", accent: "var(--blue)", Page: IrocPage,
-    blurb: "Identifica sitios fuera de EE. UU., personal clave con afiliación extranjera y posibles entidades de preocupación.",
-    meta: "Requiere LM Studio · emite certificado",
-  },
-];
+/* Prototipo B: los tres cotejos viven en esta misma página. La sobrecapa
+   es la misma que usa la página del Decanato (src/panel.jsx); aquí solo
+   cambia el índice que la lanza. */
 
 function useHealth() {
   const [health, setHealth] = useState(null);
@@ -36,61 +15,6 @@ function useHealth() {
   if (health.down) return { cls: "dot off", text: "No se pudo contactar el servidor local — ¿corriste npm run dev?" };
   if (health.reachable) return { cls: "dot on", text: `LM Studio en línea (localhost:1234) · modelo: ${health.defaultModel}` };
   return { cls: "dot off", text: "LM Studio no disponible — préndelo en Developer › Local Server. El cotejo DEI funciona igual." };
-}
-
-function Panel({ keys, caseNo, onClose }) {
-  const [active, setActive] = useState(keys[0]);
-  const [resets, setResets] = useState({});
-  const closeRef = useRef(null);
-  const restoreRef = useRef(null);
-
-  useEffect(() => {
-    restoreRef.current = document.activeElement;
-    closeRef.current?.focus();
-    document.body.classList.add("locked");
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.classList.remove("locked");
-      restoreRef.current?.focus?.();
-    };
-  }, [onClose]);
-
-  const reset = useCallback((key) => {
-    setResets((r) => ({ ...r, [key]: (r[key] || 0) + 1 }));
-  }, []);
-
-  return (
-    <div className="backdrop open" role="dialog" aria-modal="true" aria-label="Cotejo"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="panel">
-        <div className="panelbar" role="tablist">
-          {keys.length > 1 && keys.map((key) => {
-            const c = COTEJOS.find((x) => x.key === key);
-            return (
-              <button key={key} className="tab" type="button" role="tab"
-                aria-selected={active === key} style={{ "--accent": c.accent }}
-                onClick={() => setActive(key)}>{c.label}</button>
-            );
-          })}
-          <span className="caseno">{caseNo || ""}</span>
-          <button className="close" ref={closeRef} aria-label="Cerrar cotejo" onClick={onClose}>✕</button>
-        </div>
-        <div className="frames">
-          {keys.map((key) => {
-            const { Page } = COTEJOS.find((x) => x.key === key);
-            return (
-              <div key={key} className={active === key ? "active" : ""}>
-                <Page key={resets[key] || 0} embedded caseNo={caseNo}
-                  onClose={onClose} onReset={() => reset(key)} />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function Index() {
