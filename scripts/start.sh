@@ -25,20 +25,38 @@ model_ids() { printf '%s' "$1" | tr -d ' \n\t' | grep -o '"id":"[^"]*"' | cut -d
 
 LM_URL="$(env_get LM_STUDIO_URL)"; LM_URL="${LM_URL:-http://localhost:1234/v1}"
 LM_MODEL="$(env_get LM_STUDIO_MODEL)"
+AI_PROVIDER="$(env_get AI_PROVIDER)"; AI_PROVIDER="${AI_PROVIDER:-lmstudio}"
 API_PORT="$(env_get API_PORT)"; API_PORT="${API_PORT:-4000}"
 
-info "Checking LM Studio at ${LM_URL}"
-if MODELS="$(curl -fsS --max-time 5 "${LM_URL}/models" 2>/dev/null)"; then
-  ok "LM Studio is reachable"
-  if [ -n "$LM_MODEL" ] && ! model_ids "$MODELS" | grep -qxF "$LM_MODEL"; then
-    warn "LM_STUDIO_MODEL=${LM_MODEL} is not among the loaded models."
-    warn "Load it in LM Studio, or change LM_STUDIO_MODEL in .env. Loaded now:"
-    model_ids "$MODELS" | sed 's/^/       /'
+if [ "$AI_PROVIDER" = "openrouter" ]; then
+  OR_URL="$(env_get OPENROUTER_URL)"; OR_URL="${OR_URL:-https://openrouter.ai/api/v1}"
+  OR_KEY="$(env_get OPENROUTER_API_KEY)"
+  OR_MODEL="$(env_get OPENROUTER_MODEL)"; OR_MODEL="${OR_MODEL:-openai/gpt-oss-20b}"
+  info "Checking OpenRouter at ${OR_URL}"
+  if [ -z "$OR_KEY" ]; then
+    warn "OPENROUTER_API_KEY is empty. Evaluations will not run."
+  elif MODELS="$(curl -fsS --max-time 10 -H "Authorization: Bearer ${OR_KEY}" "${OR_URL}/models" 2>/dev/null)"; then
+    ok "OpenRouter is reachable and the API key was accepted"
+    if ! model_ids "$MODELS" | grep -qxF "$OR_MODEL"; then
+      warn "OPENROUTER_MODEL=${OR_MODEL} is not in the current OpenRouter model catalog."
+    fi
+  else
+    warn "OpenRouter is unreachable or rejected OPENROUTER_API_KEY."
   fi
 else
-  warn "LM Studio is NOT reachable at ${LM_URL}"
-  warn "The app will start, but evaluations will fail until you turn on"
-  warn "LM Studio -> Developer -> Local Server (or run: lms server start)."
+  info "Checking LM Studio at ${LM_URL}"
+  if MODELS="$(curl -fsS --max-time 5 "${LM_URL}/models" 2>/dev/null)"; then
+    ok "LM Studio is reachable"
+    if [ -n "$LM_MODEL" ] && ! model_ids "$MODELS" | grep -qxF "$LM_MODEL"; then
+      warn "LM_STUDIO_MODEL=${LM_MODEL} is not among the loaded models."
+      warn "Load it in LM Studio, or change LM_STUDIO_MODEL in .env. Loaded now:"
+      model_ids "$MODELS" | sed 's/^/       /'
+    fi
+  else
+    warn "LM Studio is NOT reachable at ${LM_URL}"
+    warn "The app will start, but evaluations will fail until you turn on"
+    warn "LM Studio -> Developer -> Local Server (or run: lms server start)."
+  fi
 fi
 
 if lsof -nP -iTCP:"${API_PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
@@ -55,7 +73,7 @@ if [ "$MODE" = "prod" ]; then
   warn "dist/ and forward /api to 127.0.0.1:${API_PORT}."
   echo
   info "Starting the API on port ${API_PORT}"
-  exec npm run server
+  exec npm start
 fi
 
 echo

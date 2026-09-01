@@ -4,9 +4,9 @@ Cotejo preliminar de propuestas de investigación conforme a la política federa
 julio de 2026 (EO 14292), para el Decanato de Investigación del Recinto de Ciencias
 Médicas.
 
-Corre enteramente en la computadora donde se instala: el texto de la propuesta
-nunca sale de esa máquina. La evaluación se hace contra un modelo servido
-localmente por LM Studio, y el servidor solo acepta conexiones desde `localhost`.
+Puede evaluar con un modelo local servido por LM Studio o con cualquiera de los
+modelos de chat disponibles en OpenRouter. El servidor de la aplicación solo
+acepta conexiones desde `localhost` por defecto.
 
 > **El cotejo es una ayuda de triaje.** El certificado que emite documenta que la
 > propuesta pasó el cribado automatizado; no sustituye la atestación del PI ni la
@@ -16,8 +16,10 @@ localmente por LM Studio, y el servidor solo acepta conexiones desde `localhost`
 
 - **Node.js 22.5 o superior** (usa `node:sqlite`, incluido a partir de esa versión).
   Verifica con `node -v`.
-- **[LM Studio](https://lmstudio.ai)** con al menos un modelo de chat descargado.
-  El modelo es **fijo**: `openai/gpt-oss-20b`. Debe estar cargado en LM Studio.
+- Uno de estos proveedores de modelos:
+  - **[LM Studio](https://lmstudio.ai)** con un modelo de chat descargado y cargado.
+  - **[OpenRouter](https://openrouter.ai)** con una clave API y crédito suficiente
+    para el modelo escogido.
 
 ## Instalación
 
@@ -32,13 +34,13 @@ Eso instala las dependencias y compila las páginas a `dist/`.
 
 ## Uso diario
 
-### 1. Prende el servidor local de LM Studio
+### 1. Prepara el proveedor de modelos
 
-Abre LM Studio → pestaña **Developer** (ícono `</>`) → **Local Server** →
-**Start Server**. Debe quedar escuchando en `http://localhost:1234` con al menos
-un modelo cargado.
+Con `AI_PROVIDER=lmstudio`, abre LM Studio → **Developer** → **Local Server** →
+**Start Server**. Con `AI_PROVIDER=openrouter`, configura `OPENROUTER_API_KEY` y
+`OPENROUTER_MODEL` en `.env`; no hace falta abrir LM Studio.
 
-> El cotejo DEI funciona sin LM Studio. DGOF e IROC no.
+> El cotejo DEI no usa ningún proveedor. DGOF e IROC sí.
 
 ### 2. Arranca la aplicación
 
@@ -48,8 +50,8 @@ npm start
 
 ### 3. Abre el índice
 
-Ve a **http://localhost:4000** en el navegador. Debe verse un punto verde y
-"LM Studio en línea (localhost:1234)". Si sale en rojo, revisa el paso 1.
+Ve a **http://localhost:4000** en el navegador. Debe verse un punto verde con el
+proveedor y modelo activos. Si sale en rojo, revisa el paso 1.
 
 ### 4. Escoge el cotejo
 
@@ -112,7 +114,7 @@ Cada certificado emitido se archiva además en `data/certificados/`.
 Cada cotejo es una página independiente; se puede abrir directo por URL sin
 pasar por el índice.
 
-| Página | URL | Necesita LM Studio |
+| Página | URL | Necesita proveedor de IA |
 |---|---|---|
 | Índice / lanzador | `/` | no |
 | Cotejo DEI | `/dei.html` | no |
@@ -135,16 +137,29 @@ Editable en `.env`:
 ```
 API_PORT=4000
 HOST=127.0.0.1
+AI_PROVIDER=lmstudio
 LM_STUDIO_URL=http://localhost:1234/v1
 LM_STUDIO_MODEL=openai/gpt-oss-20b
+
+OPENROUTER_URL=https://openrouter.ai/api/v1
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=openai/gpt-oss-20b
+OPENROUTER_APP_NAME=RCM Research Paper Checker
+# OPENROUTER_SITE_URL=https://example.edu
 ```
 
 `HOST=127.0.0.1` limita el acceso a esta computadora. **No lo cambies a `0.0.0.0`**
 sin antes resolver autenticación: expondría texto de propuestas sin publicar a
 cualquiera en la red del recinto.
 
-El modelo es fijo: la interfaz ya no permite escogerlo. Para cambiarlo hay que
-editar `LM_STUDIO_MODEL` aquí y reiniciar.
+Usa `AI_PROVIDER=lmstudio` o `AI_PROVIDER=openrouter`. El modelo no se selecciona
+en el navegador: cambia `LM_STUDIO_MODEL` u `OPENROUTER_MODEL` y reinicia la app.
+Los identificadores de OpenRouter se copian de su catálogo, por ejemplo
+`anthropic/claude-sonnet-4.5` o un identificador que termine en `:free` cuando esté
+disponible. La clave API solo vive en el servidor y nunca se envía al navegador.
+
+`OPENROUTER_SITE_URL` y `OPENROUTER_APP_NAME` son metadatos opcionales de
+atribución. No pongas la clave en archivos de `src/` ni en HTML.
 
 ## Mantenimiento
 
@@ -166,15 +181,16 @@ sqlite3 data/cases.db "SELECT case_no, pi_name, proposal_title, verdict, signed_
 - La **lista oficial de entidades de preocupación** aún no se publica. El cotejo
   IROC señala afiliaciones extranjeras para que un humano las verifique contra
   esa lista cuando salga; no la sustituye.
-- El modelo local puede equivocarse en ambas direcciones. El prompt está escrito
+- El modelo puede equivocarse en ambas direcciones. El prompt está escrito
   para ser conservador (señalar en vez de despachar), pero un veredicto de
   "sin hallazgos" no exime al PI de su atestación.
 - No hay control de acceso: quien tenga la sesión abierta en esa computadora
   puede emitir certificados. Si eso importa, corre la aplicación en una cuenta de
   usuario dedicada.
-- El PDF se convierte a texto antes de llegar al modelo. `openai/gpt-oss-20b` es
-  un modelo de solo texto y la API de LM Studio no acepta documentos, así que no
-  es posible pasarle el PDF directamente.
+- El PDF se convierte a texto antes de llegar al modelo. Con OpenRouter, ese texto
+  sale de la computadora y queda sujeto a las políticas del proveedor y del modelo
+  escogido; no se debe habilitar para propuestas confidenciales sin autorización
+  institucional y una revisión de privacidad adecuada.
 
 ## Desarrollo
 

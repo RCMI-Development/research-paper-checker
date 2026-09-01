@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "vite build",
+    "test": "node --test",
     "start": "node server/index.js",
     "setup": "npm install && npm run build",
     "dev": "concurrently -n server,web -c blue,green \"node server/index.js\" \"vite\""

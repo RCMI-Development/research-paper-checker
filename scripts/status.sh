@@ -17,17 +17,32 @@ model_ids() { printf '%s' "$1" | tr -d ' \n\t' | grep -o '"id":"[^"]*"' | cut -d
 
 LM_URL="$(env_get LM_STUDIO_URL)"; LM_URL="${LM_URL:-http://localhost:1234/v1}"
 LM_MODEL="$(env_get LM_STUDIO_MODEL)"
+AI_PROVIDER="$(env_get AI_PROVIDER)"; AI_PROVIDER="${AI_PROVIDER:-lmstudio}"
 API_PORT="$(env_get API_PORT)"; API_PORT="${API_PORT:-4000}"
 API_URL="http://localhost:${API_PORT}"
 
 printf '\033[34m==>\033[0m Service status\n'
 
-MODELS="$(curl -fsS --max-time 5 "${LM_URL}/models" 2>/dev/null)"
+if [ "$AI_PROVIDER" = "openrouter" ]; then
+  PROVIDER_LABEL="OpenRouter"
+  PROVIDER_URL="$(env_get OPENROUTER_URL)"; PROVIDER_URL="${PROVIDER_URL:-https://openrouter.ai/api/v1}"
+  PROVIDER_MODEL="$(env_get OPENROUTER_MODEL)"; PROVIDER_MODEL="${PROVIDER_MODEL:-openai/gpt-oss-20b}"
+  PROVIDER_KEY="$(env_get OPENROUTER_API_KEY)"
+  MODELS=""
+  if [ -n "$PROVIDER_KEY" ]; then
+    MODELS="$(curl -fsS --max-time 10 -H "Authorization: Bearer ${PROVIDER_KEY}" "${PROVIDER_URL}/models" 2>/dev/null)"
+  fi
+else
+  PROVIDER_LABEL="LM Studio"
+  PROVIDER_URL="$LM_URL"
+  PROVIDER_MODEL="$LM_MODEL"
+  MODELS="$(curl -fsS --max-time 5 "${PROVIDER_URL}/models" 2>/dev/null)"
+fi
 if [ -n "$MODELS" ]; then
   COUNT="$(model_ids "$MODELS" | wc -l | tr -d ' ')"
-  ok "LM Studio        ${LM_URL}  (${COUNT} model(s) loaded)"
+  ok "${PROVIDER_LABEL}        ${PROVIDER_URL}  (${COUNT} model(s) available)"
 else
-  down "LM Studio        ${LM_URL}  -> turn on Developer > Local Server"
+  down "${PROVIDER_LABEL}        ${PROVIDER_URL}  -> check provider configuration"
 fi
 
 if curl -fsS --max-time 5 "${API_URL}/api/health" >/dev/null 2>&1; then
@@ -64,22 +79,21 @@ else
   note "database data/cases.db not created yet -> it appears on first run"
 fi
 
-if [ -n "$MODELS" ] && [ -n "$LM_MODEL" ]; then
-  if model_ids "$MODELS" | grep -qxF "$LM_MODEL"; then
-    good "LM_STUDIO_MODEL=${LM_MODEL} is loaded"
+if [ -n "$MODELS" ] && [ -n "$PROVIDER_MODEL" ]; then
+  if model_ids "$MODELS" | grep -qxF "$PROVIDER_MODEL"; then
+    good "Configured model ${PROVIDER_MODEL} is available"
   else
-    bad "LM_STUDIO_MODEL=${LM_MODEL} is NOT loaded in LM Studio. Loaded now:"
-    model_ids "$MODELS" | sed 's/^/         /'
+    bad "Configured model ${PROVIDER_MODEL} is NOT available from ${PROVIDER_LABEL}."
   fi
 fi
 
 printf '\n\033[34m==>\033[0m End-to-end check\n'
 HEALTH="$(curl -fsS --max-time 10 "${API_URL}/api/health" 2>/dev/null || true)"
 if [ -z "$HEALTH" ]; then
-  down "The API is not answering, so it cannot be checked against LM Studio."
+  down "The API is not answering, so its model provider cannot be checked."
 elif printf '%s' "$HEALTH" | grep -q '"reachable":true'; then
-  ok "The API can talk to LM Studio. The app is fully operational."
+  ok "The API can talk to ${PROVIDER_LABEL}. The app is fully operational."
 else
-  down "The API is up but cannot reach LM Studio:"
+  down "The API is up but cannot reach ${PROVIDER_LABEL}:"
   printf '       %s\n' "$HEALTH"
 fi

@@ -42,7 +42,7 @@ else
   [ -f .env.example ] || fail ".env.example is missing, cannot create .env"
   cp .env.example .env
   ok ".env created from .env.example"
-  warn "Open .env and confirm LM_STUDIO_MODEL matches a model you have in LM Studio"
+  warn "Open .env and configure AI_PROVIDER plus the model and credentials it needs"
 fi
 
 info "Preparing folders"
@@ -59,17 +59,32 @@ ok "database ready"
 # LM Studio pretty-prints its JSON ("id": "x"), so strip whitespace before matching.
 model_ids() { printf '%s' "$1" | tr -d ' \n\t' | grep -o '"id":"[^"]*"' | cut -d'"' -f4; }
 
-LM_URL="$(grep -E '^LM_STUDIO_URL=' .env | tail -1 | cut -d= -f2- || true)"
-LM_URL="${LM_URL:-http://localhost:1234/v1}"
-info "Checking LM Studio at ${LM_URL}"
-if MODELS="$(curl -fsS --max-time 5 "${LM_URL}/models" 2>/dev/null)"; then
-  ok "LM Studio is reachable. Models you can put in LM_STUDIO_MODEL:"
-  model_ids "$MODELS" | sed 's/^/       /'
+AI_PROVIDER="$(grep -E '^AI_PROVIDER=' .env | tail -1 | cut -d= -f2- || true)"
+AI_PROVIDER="${AI_PROVIDER:-lmstudio}"
+if [ "$AI_PROVIDER" = "openrouter" ]; then
+  OR_URL="$(grep -E '^OPENROUTER_URL=' .env | tail -1 | cut -d= -f2- || true)"
+  OR_URL="${OR_URL:-https://openrouter.ai/api/v1}"
+  OR_KEY="$(grep -E '^OPENROUTER_API_KEY=' .env | tail -1 | cut -d= -f2- || true)"
+  if [ -z "$OR_KEY" ]; then
+    warn "OPENROUTER_API_KEY is empty; add a key before running DGOF or IROC."
+  elif curl -fsS --max-time 10 -H "Authorization: Bearer ${OR_KEY}" "${OR_URL}/models" >/dev/null 2>&1; then
+    ok "OpenRouter is reachable and the API key was accepted"
+  else
+    warn "OpenRouter could not be reached or rejected the configured API key."
+  fi
 else
-  warn "LM Studio is not reachable yet (that is fine for setup)."
+  LM_URL="$(grep -E '^LM_STUDIO_URL=' .env | tail -1 | cut -d= -f2- || true)"
+  LM_URL="${LM_URL:-http://localhost:1234/v1}"
+  info "Checking LM Studio at ${LM_URL}"
+  if MODELS="$(curl -fsS --max-time 5 "${LM_URL}/models" 2>/dev/null)"; then
+    ok "LM Studio is reachable. Models you can put in LM_STUDIO_MODEL:"
+    model_ids "$MODELS" | sed 's/^/       /'
+  else
+    warn "LM Studio is not reachable yet (that is fine for setup)."
+  fi
 fi
 
 echo
 info "Setup complete."
-echo "  Next:  1. Start the LM Studio local server (Developer -> Local Server)."
+echo "  Next:  1. Confirm the provider settings in .env."
 echo "         2. Run  ./scripts/start.sh"
