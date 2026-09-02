@@ -57,3 +57,49 @@ test("health reports whether the selected model exists", async () => {
   assert.equal(health.loaded, true);
   assert.equal(health.providerLabel, "OpenRouter");
 });
+
+test("Ollama is a local OpenAI-compatible provider", () => {
+  const provider = getModelProvider({ AI_PROVIDER: "ollama", OLLAMA_MODEL: "gpt-oss:20b" });
+  assert.equal(provider.id, "ollama");
+  assert.equal(provider.label, "Ollama");
+  assert.equal(provider.baseUrl, "http://127.0.0.1:11434/v1");
+  assert.equal(provider.model, "gpt-oss:20b");
+  assert.equal(provider.remote, false);
+  assert.equal(provider.configured, true);
+  assert.equal(provider.headers.Authorization, undefined);
+});
+
+test("Ollama health reports the tag Ollama itself returns", async () => {
+  const provider = getModelProvider({ AI_PROVIDER: "ollama", OLLAMA_MODEL: "llama3.2:3b" });
+  const health = await getProviderHealth(provider, async (url) => {
+    assert.equal(url, "http://127.0.0.1:11434/v1/models");
+    return { ok: true, json: async () => ({ data: [{ id: "llama3.2:3b" }] }) };
+  });
+  assert.equal(health.providerLabel, "Ollama");
+  assert.equal(health.reachable, true);
+  assert.equal(health.loaded, true);
+});
+
+test("a pulled-but-absent Ollama model is reported as not loaded", async () => {
+  const provider = getModelProvider({ AI_PROVIDER: "ollama", OLLAMA_MODEL: "qwen2.5:14b" });
+  const health = await getProviderHealth(provider, async () => ({
+    ok: true,
+    json: async () => ({ data: [{ id: "llama3.2:3b" }] }),
+  }));
+  assert.equal(health.reachable, true);
+  assert.equal(health.loaded, false);
+});
+
+test("an unreachable Ollama degrades instead of throwing", async () => {
+  const provider = getModelProvider({ AI_PROVIDER: "ollama" });
+  const health = await getProviderHealth(provider, async () => {
+    throw new Error("ECONNREFUSED");
+  });
+  assert.equal(health.ok, true);
+  assert.equal(health.reachable, false);
+  assert.match(health.error, /ECONNREFUSED/);
+});
+
+test("unknown providers are rejected by name", () => {
+  assert.throws(() => getModelProvider({ AI_PROVIDER: "vllm" }), /vllm/);
+});

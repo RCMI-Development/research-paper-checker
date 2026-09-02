@@ -9,3 +9,8 @@ data/uploads/*
 data/certificados/*
 .env
 .DS_Store
+data/*.sqlite3
+dist.new
+dist.prev
+.deploy-prev-sha
+.env.bak-*

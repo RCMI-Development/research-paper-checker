@@ -278,8 +278,11 @@ app.get("/api/cases/:id", (req, res) => {
 const hasBuild = existsSync(path.join(DIST_DIR, "index.html"));
 if (hasBuild) app.use(express.static(DIST_DIR));
 
-app.listen(PORT, HOST, () => {
-  console.log(`Servidor de cotejo escuchando en http://localhost:${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Servidor de cotejo escuchando en http://${HOST}:${PORT}`);
+  if (HOST === "0.0.0.0") {
+    console.log("Aviso: expuesto a toda la red y la aplicación no tiene autenticación.");
+  }
   console.log(`${modelProvider.label}: ${modelProvider.baseUrl} (modelo: ${modelProvider.model})`);
   if (hasBuild) {
     console.log(`Índice: http://localhost:${PORT}/  ·  cotejos: /dei.html · /dgof.html · /iroc.html`);
@@ -287,3 +290,42 @@ app.listen(PORT, HOST, () => {
     console.log("Aviso: no hay build en dist/. Corre `npm run build` para servir las páginas.");
   }
 });
+
+/* systemd manda SIGTERM en cada reinicio y un cotejo puede tardar minutos contra
+   el modelo. Se cierra el listener, se deja terminar lo que ya está en vuelo y
+   solo entonces se cierra la base. El temporizador es el último recurso. */
+const SHUTDOWN_GRACE_MS = Number(process.env.SHUTDOWN_GRACE_MS) || 30000;
+let shuttingDown = false;
+
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} recibido: no se aceptan peticiones nuevas, terminando las que están en curso.`);
+
+  const forced = setTimeout(() => {
+    console.error(`Los cotejos en curso no terminaron en ${SHUTDOWN_GRACE_MS} ms; se cierra a la fuerza.`);
+    process.exit(1);
+  }, SHUTDOWN_GRACE_MS);
+  forced.unref();
+
+  server.close((err) => {
+    if (err) console.error(`Error al cerrar el servidor: ${err.message}`);
+    try {
+      /* data/ es el expediente y se respalda: dejarlo en un solo archivo, sin
+         cases.db-wal huérfano. */
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      db.close();
+    } catch (e) {
+      console.error(`Error al cerrar la base: ${e.message}`);
+    }
+    clearTimeout(forced);
+    process.exit(err ? 1 : 0);
+  });
+  /* Sin esto, una pestaña con keep-alive abierta mantiene viva la conexión y
+     server.close() nunca llama de vuelta. */
+  server.closeIdleConnections();
+}
+
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  process.on(signal, () => shutdown(signal));
+}
