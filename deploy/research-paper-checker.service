@@ -1,0 +1,104 @@
+[Unit]
+Description=Research Paper Checker — cotejos DGOF/IROC/DEI (RCM)
+Documentation=https://github.com/RCMI-Development/research-paper-checker
+# Dependencia BLANDA con Ollama, nunca Requires=. El cotejo DEI no usa modelo y
+# GET /api/cases es el expediente auditable: ninguno de los dos debe caer porque
+# el modelo esté apagado. getProviderHealth ya devuelve reachable:false en vez de
+# fallar, y la interfaz lo pinta en rojo. Esa degradación ya está diseñada.
+After=ollama.service
+Wants=ollama.service
+# network.target basta: el bind es 0.0.0.0, no una IP concreta que tenga que
+# existir primero. network-online.target añadiría 30-120 s a cada arranque.
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+# exec, no simple: espera a que execve() funcione, así un ExecStart mal escrito
+# o un User= inexistente sale como fallo de arranque y no como "active" seguido
+# de una muerte 5 ms después.
+Type=exec
+User=rpchecker
+Group=rpchecker
+WorkingDirectory=/opt/research-paper-checker
+# systemd carga esto ANTES que dotenv, y dotenv nunca pisa una variable que ya
+# exista: si los dos discrepan, gana systemd. Sin "-": si falta el archivo,
+# queremos un fallo ruidoso, no arrancar con los valores por defecto.
+EnvironmentFile=/opt/research-paper-checker/.env
+Environment=NODE_ENV=production
+# El techo del heap de V8 va POR DEBAJO de MemoryMax. V8 dimensiona su old-space
+# según la RAM del anfitrión, no la del cgroup: sin esto no colecta a tiempo y el
+# cgroup lo mata antes de que intente un GC completo.
+Environment=NODE_OPTIONS=--max-old-space-size=1024
+# Menor que TimeoutStopSec, para que el proceso siempre salga por su cuenta.
+Environment=SHUTDOWN_GRACE_MS=90000
+
+# hasBuild (server/index.js) se evalúa UNA vez al cargar el módulo. Sin este
+# guardia, un build fallido arranca un servidor que sirve /api y devuelve 404 en
+# /, y systemctl status lo muestra verde.
+ExecStartPre=/usr/bin/test -f /opt/research-paper-checker/dist/index.html
+# node:sqlite estuvo detrás de un flag hasta 22.13 y server/db.js no tiene
+# alternativa. Que falle aquí y no en la primera petición.
+ExecStartPre=/usr/bin/node --input-type=module -e 'import("node:sqlite").then(()=>process.exit(0),()=>process.exit(1))'
+ExecStart=/usr/bin/node /opt/research-paper-checker/server/index.js
+
+# always, no on-failure: con el manejador de SIGTERM la salida limpia es 0, y
+# on-failure dejaría el servicio muerto tras cualquier kill suelto. No estorba a
+# `systemctl stop`, que no consulta Restart=.
+Restart=always
+RestartSec=2
+RestartSteps=5
+RestartMaxDelaySec=60
+TimeoutStartSec=30
+# Un POST /api/evaluate puede tardar minutos. El proceso se autotermina a los
+# 90 s (SHUTDOWN_GRACE_MS), así que aquí sobra margen y nunca llega el SIGKILL.
+TimeoutStopSec=120
+KillSignal=SIGTERM
+
+# multer bufferea hasta 25 MB en memoria y pdf-parse expande el PDF a strings.
+MemoryHigh=1G
+MemoryMax=1500M
+MemorySwapMax=0
+TasksMax=256
+OOMPolicy=stop
+
+# ── endurecimiento ──
+# El expediente lleva texto de propuestas sin publicar.
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+# data/ es el ÚNICO camino escribible. Ojo: si el directorio no existe, el
+# servicio no arranca (error de namespace, no de permisos).
+ReadWritePaths=/opt/research-paper-checker/data
+ProtectHome=true
+ProtectProc=invisible
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0027
+# NO poner MemoryDenyWriteExecute=true: el JIT de V8 lo necesita en false.
+# systemd-analyze security lo va a pedir; ignóralo, rompe el arranque.
+MemoryDenyWriteExecute=false
+# NO poner ProcSubset=pid: esconde /proc/cpuinfo y /proc/stat, y os.cpus()
+# empieza a devolver [].
+
+SyslogIdentifier=rpchecker
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

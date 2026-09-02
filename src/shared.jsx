@@ -135,9 +135,9 @@ export function Stamp({ verdict }) {
   );
 }
 
-/* ── estado de LM Studio (sin selector: el modelo es fijo) ── */
+/* ── estado del proveedor de modelos (sin exponer credenciales al cliente) ── */
 
-export function useLmStudio() {
+export function useModelProvider() {
   const [health, setHealth] = useState(null);
   useEffect(() => {
     fetch("/api/health")
@@ -149,13 +149,16 @@ export function useLmStudio() {
 }
 
 export function ModelBar({ health }) {
+  const provider = health?.providerLabel || "proveedor de IA";
   const estado = health == null
-    ? "Conectando a LM Studio…"
+    ? "Conectando al proveedor de IA…"
+    : health.configured === false
+      ? `${provider} no está configurado — falta la clave API`
     : !health.reachable
-      ? "LM Studio no disponible — préndelo en Developer › Local Server"
+      ? `${provider} no está disponible`
       : health.loaded === false
-        ? `LM Studio en línea, pero ${health.model} no está cargado`
-        : `LM Studio en línea · modelo ${health.model}`;
+        ? `${provider} en línea, pero ${health.model} no está disponible`
+        : `${provider} en línea · modelo ${health.model}`;
 
   const color = health == null ? C.rule
     : health.reachable && health.loaded !== false ? C.stampBlue : C.stampRed;
@@ -206,7 +209,8 @@ export function Shell({ tag, title, blurb, children, bar }) {
         <p className="no-print" style={{ fontSize: 12.5, color: C.soft, lineHeight: 1.65, marginTop: 18, borderTop: `1px solid ${C.rule}`, paddingTop: 14 }}>
           Prototipo. El cotejo automatizado es una ayuda de triaje: reduce el trabajo de lectura,
           no sustituye la atestación del PI ni la certificación del ICDGOF, ambas bajo pena de ley.
-          Todo corre en esta computadora — nada del texto de la propuesta sale de aquí.
+          DEI corre enteramente en esta computadora. DGOF e IROC envían el texto extraído
+          al proveedor de modelos configurado; con OpenRouter, el texto sale de esta computadora.
         </p>
       </div>
     </div>

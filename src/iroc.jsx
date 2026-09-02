@@ -2,14 +2,14 @@ import React, { useState, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import {
   C, Shell, Intake, Resultado, DatosCertificado, Certificado, InformeHallazgos,
-  ModelBar, useLmStudio, severityOf, runEvaluation, saveCase,
+  ModelBar, useModelProvider, severityOf, runEvaluation, saveCase,
 } from "./shared.jsx";
 
 /* Cotejo IROC — investigación internacional de preocupación: sitios
    fuera de EE. UU., colaboradores extranjeros y entidades de preocupación. */
 
 function IrocPage() {
-  const health = useLmStudio();
+  const health = useModelProvider();
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -19,6 +19,7 @@ function IrocPage() {
   const [proposalTitle, setProposalTitle] = useState("");
   const [emitido, setEmitido] = useState(false);
   const [guardado, setGuardado] = useState(null);
+  const [model, setModel] = useState(null);
 
   const verdict = useMemo(
     () => (iroc ? severityOf("iroc", iroc.determination) : null),
@@ -31,6 +32,7 @@ function IrocPage() {
     try {
       const data = await runEvaluation({ file, tasks: ["iroc"] });
       setIroc(data.iroc);
+      setModel(data.model);
     } catch (e) {
       setErr(e.message || "La evaluación no se completó. Revisa el documento e inténtalo otra vez.");
     } finally {
@@ -45,7 +47,7 @@ function IrocPage() {
         id: registroId,
         fileName: file?.name || null,
         piName, proposalTitle,
-        iroc, verdict, model: "openai/gpt-oss-20b",
+        iroc, verdict, model: model || health?.model || null,
         signer: piName,
       });
       if (r?.id) setRegistroId(r.id);
@@ -64,7 +66,7 @@ function IrocPage() {
 
   const findings = iroc?.findings || [];
 
-  const ready = file && !busy && health?.reachable;
+  const ready = file && !busy && health?.reachable && health?.loaded !== false;
   const hayHallazgos = findings.length > 0;
   const paso3 = !!verdict;
 
@@ -90,7 +92,7 @@ function IrocPage() {
         onRun={run} busy={busy} ready={ready}
         runLabel="Iniciar cotejo IROC"
         err={err}
-        note={health && !health.reachable ? "Requiere LM Studio prendido en Developer › Local Server." : null}
+        note={health && !health.reachable ? (health.error || "El proveedor de IA configurado no está disponible.") : null}
       />
 
       {iroc && (

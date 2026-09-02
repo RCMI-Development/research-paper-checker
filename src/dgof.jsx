@@ -2,14 +2,14 @@ import React, { useState, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import {
   C, DGOF_OUTCOMES, Shell, Intake, Resultado, DatosCertificado, Certificado, InformeHallazgos,
-  ModelBar, useLmStudio, severityOf, runEvaluation, saveCase,
+  ModelBar, useModelProvider, severityOf, runEvaluation, saveCase,
 } from "./shared.jsx";
 
 /* Cotejo DGOF — evalúa la propuesta contra los siete resultados de
    ganancia de función bajo la política federal de julio de 2026. */
 
 function DgofPage() {
-  const health = useLmStudio();
+  const health = useModelProvider();
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -19,6 +19,7 @@ function DgofPage() {
   const [proposalTitle, setProposalTitle] = useState("");
   const [emitido, setEmitido] = useState(false);
   const [guardado, setGuardado] = useState(null);
+  const [model, setModel] = useState(null);
 
   const verdict = useMemo(
     () => (dgof ? severityOf("dgof", dgof.determination) : null),
@@ -31,6 +32,7 @@ function DgofPage() {
     try {
       const data = await runEvaluation({ file, tasks: ["dgof"] });
       setDgof(data.dgof);
+      setModel(data.model);
     } catch (e) {
       setErr(e.message || "La evaluación no se completó. Revisa el documento e inténtalo otra vez.");
     } finally {
@@ -45,7 +47,7 @@ function DgofPage() {
         id: registroId,
         fileName: file?.name || null,
         piName, proposalTitle,
-        dgof, verdict, model: "openai/gpt-oss-20b",
+        dgof, verdict, model: model || health?.model || null,
         signer: piName,
       });
       if (r?.id) setRegistroId(r.id);
@@ -65,7 +67,7 @@ function DgofPage() {
 
   const findings = dgof?.findings || [];
 
-  const ready = file && !busy && health?.reachable;
+  const ready = file && !busy && health?.reachable && health?.loaded !== false;
   const hayHallazgos = findings.length > 0;
   const paso3 = !!verdict;
 
@@ -81,7 +83,7 @@ function DgofPage() {
         onRun={run} busy={busy} ready={ready}
         runLabel="Iniciar cotejo DGOF"
         err={err}
-        note={health && !health.reachable ? "Requiere LM Studio prendido en Developer › Local Server." : null}
+        note={health && !health.reachable ? (health.error || "El proveedor de IA configurado no está disponible.") : null}
       />
 
       {dgof && (

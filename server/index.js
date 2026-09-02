@@ -9,6 +9,7 @@ import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import db from "./db.js";
 import { DGOF_PROMPT, IROC_PROMPT, DGOF_RULES, IROC_RULES } from "./prompts.js";
 import { construirCertificado, construirInforme, nombreArchivo } from "./certificado.js";
+import { askModel, getModelProvider, getProviderHealth } from "./model-provider.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, "..", "data", "uploads");
@@ -19,9 +20,7 @@ const PORT = process.env.API_PORT || 4000;
 /* Solo localhost por defecto: el expediente lleva texto de propuestas sin
    publicar, así que no debe quedar expuesto a la red del recinto. */
 const HOST = process.env.HOST || "127.0.0.1";
-const LM_STUDIO_URL = process.env.LM_STUDIO_URL || "http://localhost:1234/v1";
-/* Modelo fijo: la interfaz ya no permite escogerlo. */
-const MODEL = process.env.LM_STUDIO_MODEL || "openai/gpt-oss-20b";
+const modelProvider = getModelProvider();
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -42,43 +41,14 @@ function extractJson(raw) {
   }
 }
 
-async function askLmStudio(prompt, proposalText) {
-  const res = await fetch(`${LM_STUDIO_URL}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: MODEL,
-      temperature: 0.2,
-      /* gpt-oss-20b gasta parte del presupuesto en tokens de razonamiento
-         antes de emitir el JSON; con 1200 se quedaba corto. */
-      max_tokens: 2500,
-      messages: [
-        {
-          role: "system",
-          content: "You are a compliance screening assistant. Respond with strict JSON only — no markdown fences, no commentary, no text before or after the JSON object.",
-        },
-        { role: "user", content: `${prompt}\n\n<propuesta>\n${proposalText}\n</propuesta>` },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`LM Studio respondió ${res.status}: ${body.slice(0, 300)}`);
-  }
-  const data = await res.json();
+async function evaluateWithModel(prompt, proposalText) {
+  const data = await askModel(modelProvider, prompt, proposalText);
   const raw = data.choices?.[0]?.message?.content ?? "";
   return extractJson(raw);
 }
 
 app.get("/api/health", async (_req, res) => {
-  try {
-    const r = await fetch(`${LM_STUDIO_URL}/models`);
-    const data = await r.json();
-    const ids = data.data?.map((m) => m.id) ?? [];
-    res.json({ ok: true, reachable: true, model: MODEL, loaded: ids.includes(MODEL) });
-  } catch (e) {
-    res.json({ ok: true, reachable: false, error: String(e.message || e), model: MODEL });
-  }
+  res.json(await getProviderHealth(modelProvider));
 });
 
 /* Devuelve el texto separado por página. El número de página es parte del
@@ -189,8 +159,8 @@ app.post("/api/evaluate", upload.single("file"), async (req, res) => {
     const etiquetado = paginasEtiquetadas(paginas);
     const tasks = (req.body.tasks ?? "dgof,iroc").split(",").map((t) => t.trim()).filter(Boolean);
     const [dgofBruto, irocBruto] = await Promise.all([
-      tasks.includes("dgof") ? askLmStudio(DGOF_PROMPT, etiquetado) : Promise.resolve(null),
-      tasks.includes("iroc") ? askLmStudio(IROC_PROMPT, etiquetado) : Promise.resolve(null),
+      tasks.includes("dgof") ? evaluateWithModel(DGOF_PROMPT, etiquetado) : Promise.resolve(null),
+      tasks.includes("iroc") ? evaluateWithModel(IROC_PROMPT, etiquetado) : Promise.resolve(null),
     ]);
     const dgof = revisaHallazgos(dgofBruto, paginas, DGOF_RULES);
     const iroc = revisaHallazgos(irocBruto, paginas, IROC_RULES);
@@ -200,7 +170,8 @@ app.post("/api/evaluate", upload.single("file"), async (req, res) => {
       filePath,
       proposalExcerpt: text.slice(0, 4000),
       numPages: paginas.length,
-      model: MODEL,
+      model: modelProvider.model,
+      provider: modelProvider.id,
       dgof,
       iroc,
     });
@@ -307,12 +278,54 @@ app.get("/api/cases/:id", (req, res) => {
 const hasBuild = existsSync(path.join(DIST_DIR, "index.html"));
 if (hasBuild) app.use(express.static(DIST_DIR));
 
-app.listen(PORT, HOST, () => {
-  console.log(`Servidor de cotejo escuchando en http://localhost:${PORT}`);
-  console.log(`LM Studio: ${LM_STUDIO_URL} (modelo fijo: ${MODEL})`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Servidor de cotejo escuchando en http://${HOST}:${PORT}`);
+  if (HOST === "0.0.0.0") {
+    console.log("Aviso: expuesto a toda la red y la aplicación no tiene autenticación.");
+  }
+  console.log(`${modelProvider.label}: ${modelProvider.baseUrl} (modelo: ${modelProvider.model})`);
   if (hasBuild) {
     console.log(`Índice: http://localhost:${PORT}/  ·  cotejos: /dei.html · /dgof.html · /iroc.html`);
   } else {
     console.log("Aviso: no hay build en dist/. Corre `npm run build` para servir las páginas.");
   }
 });
+
+/* systemd manda SIGTERM en cada reinicio y un cotejo puede tardar minutos contra
+   el modelo. Se cierra el listener, se deja terminar lo que ya está en vuelo y
+   solo entonces se cierra la base. El temporizador es el último recurso. */
+const SHUTDOWN_GRACE_MS = Number(process.env.SHUTDOWN_GRACE_MS) || 30000;
+let shuttingDown = false;
+
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} recibido: no se aceptan peticiones nuevas, terminando las que están en curso.`);
+
+  const forced = setTimeout(() => {
+    console.error(`Los cotejos en curso no terminaron en ${SHUTDOWN_GRACE_MS} ms; se cierra a la fuerza.`);
+    process.exit(1);
+  }, SHUTDOWN_GRACE_MS);
+  forced.unref();
+
+  server.close((err) => {
+    if (err) console.error(`Error al cerrar el servidor: ${err.message}`);
+    try {
+      /* data/ es el expediente y se respalda: dejarlo en un solo archivo, sin
+         cases.db-wal huérfano. */
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      db.close();
+    } catch (e) {
+      console.error(`Error al cerrar la base: ${e.message}`);
+    }
+    clearTimeout(forced);
+    process.exit(err ? 1 : 0);
+  });
+  /* Sin esto, una pestaña con keep-alive abierta mantiene viva la conexión y
+     server.close() nunca llama de vuelta. */
+  server.closeIdleConnections();
+}
+
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  process.on(signal, () => shutdown(signal));
+}
