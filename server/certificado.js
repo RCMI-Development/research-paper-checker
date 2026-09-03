@@ -186,9 +186,23 @@ export function construirInforme({ cotejo, piName, proposalTitle, findings }) {
         .moveTo(izq + 24, y).lineTo(izq + 24, y + alto + 4).stroke();
       doc.font("Times-Italic").fontSize(10).fillColor(INK)
         .text(f.sentence, izq + 34, y + 2, { width: ancho - 46, lineGap: 1.5 });
-      y = doc.y + 14;
+      y = doc.y + 8;
     } else {
       y += 8;
+    }
+
+    if (f.suggestion) {
+      doc.font("Helvetica-Bold").fontSize(7.5).fillColor(BLUE)
+        .text("SUGGESTED REWORDING", izq + 24, y, { characterSpacing: 0.8 });
+      y = doc.y + 3;
+      const alto = doc.heightOfString(f.suggestion, { width: ancho - 40 });
+      doc.lineWidth(2.5).strokeColor(BLUE)
+        .moveTo(izq + 24, y).lineTo(izq + 24, y + alto + 4).stroke();
+      doc.font("Times-Italic").fontSize(10).fillColor(INK)
+        .text(f.suggestion, izq + 34, y + 2, { width: ancho - 46, lineGap: 1.5 });
+      y = doc.y + 14;
+    } else {
+      y += 6;
     }
   });
 

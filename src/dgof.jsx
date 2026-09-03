@@ -77,6 +77,7 @@ function DgofPage() {
       title="Cotejo DGOF"
       blurb="Evaluación de investigación peligrosa de ganancia de función conforme a la política federal de julio de 2026 (EO 14292)."
       bar={<ModelBar health={health} />}
+      health={health}
     >
       <Intake
         file={file} setFile={setFile}

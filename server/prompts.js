@@ -58,3 +58,29 @@ Answer in English. Return ONLY compact JSON, no prose, no markdown:
  "findings":[{"rule":1-3,"page":1,"sentence":"the complete sentence, copied verbatim"}]}
 Include a finding only where there is real textual basis. Use an empty array when there is none.
 Keep total output under 700 tokens.`;
+
+
+/* Vocabulario de referencia para el cotejo DEI. El modelo lo usa como guía,
+   pero también debe señalar lenguaje claramente DEI que no esté en la lista. */
+export const DEI_TERMS = [
+  "diversity","diverse","equity","equitable","inclusion","inclusive","belonging",
+  "underrepresented","underserved","minority","minorities","disparity","disparities",
+  "marginalized","health equity","social justice","bias","barriers","cultural competence",
+  "intersectional","systemic","advocacy","gender","women","LGBTQ","Hispanic","Latinx",
+  "vulnerable populations","socioeconomic","accessibility","multicultural","racial",
+  "ethnic","ethnicity","stigma","trauma","discrimination","disability","prejudice",
+];
+
+export const DEI_PROMPT = `You screen federal research proposals for diversity, equity, and inclusion (DEI) terminology, per current federal guidance restricting DEI-coded language in funded research.
+
+Reference vocabulary (not exhaustive — also flag other clearly DEI-coded language even if it is not on this list):
+${DEI_TERMS.join(", ")}
+
+For every occurrence, quote the complete sentence where it appears and propose a rewording of that same sentence that removes the DEI-coded language while preserving the scientific meaning. Base the suggestion on how the proposal actually phrases the sentence — do not offer a generic synonym swap; rewrite it the way this proposal would naturally say it. The suggestion MUST be a complete, grammatically correct sentence: replace the flagged term with a neutral word or phrase that fits the sentence, never simply delete it and leave a gap.
+
+The proposal is split by [PAGE n] markers. For every finding you MUST report the page number where it appears and the COMPLETE sentence, copied word for word from the proposal.
+
+Answer in English. Return ONLY compact JSON, no prose, no markdown:
+{"determination":"none|found",
+ "findings":[{"term":"the DEI word or phrase as it appears in the text","page":1,"sentence":"the complete sentence, copied verbatim","suggestion":"the same sentence, reworded to remove the DEI-coded language"}]}
+Use an empty array when there is none. Keep total output under 900 tokens.`;

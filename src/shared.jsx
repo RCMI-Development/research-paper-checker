@@ -29,15 +29,6 @@ export const F = {
   mono: "'IBM Plex Mono', 'Courier New', monospace",
 };
 
-export const DEFAULT_DEI_TERMS = [
-  "diversity","diverse","equity","equitable","inclusion","inclusive","belonging",
-  "underrepresented","underserved","minority","minorities","disparity","disparities",
-  "marginalized","health equity","social justice","bias","barriers","cultural competence",
-  "intersectional","systemic","advocacy","gender","women","LGBTQ","Hispanic","Latinx",
-  "vulnerable populations","socioeconomic","accessibility","multicultural","racial",
-  "ethnic","ethnicity","stigma","trauma","discrimination","disability","prejudice",
-];
-
 export const DGOF_OUTCOMES = [
   "Agrava las consecuencias dañinas del agente (incl. organismos espejo)",
   "Interrumpe la respuesta inmune o la efectividad de una vacuna",
@@ -176,7 +167,7 @@ export function ModelBar({ health }) {
 
 /* ── armazón de página ── */
 
-export function Shell({ tag, title, blurb, children, bar }) {
+export function Shell({ tag, title, blurb, children, bar, health }) {
   return (
     <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: F.body }}>
       <GlobalStyle />
@@ -208,9 +199,10 @@ export function Shell({ tag, title, blurb, children, bar }) {
         </div>
         <p className="no-print" style={{ fontSize: 12.5, color: C.soft, lineHeight: 1.65, marginTop: 18, borderTop: `1px solid ${C.rule}`, paddingTop: 14 }}>
           Prototipo. El cotejo automatizado es una ayuda de triaje: reduce el trabajo de lectura,
-          no sustituye la atestación del PI ni la certificación del ICDGOF, ambas bajo pena de ley.
-          DEI corre enteramente en esta computadora. DGOF e IROC envían el texto extraído
-          al proveedor de modelos configurado; con OpenRouter, el texto sale de esta computadora.
+          no sustituye la atestación del PI ni la certificación del ICDGOF, ambas bajo pena de ley.{" "}
+          {health?.remote
+            ? `El texto de la propuesta se envía a ${health.providerLabel || "un proveedor remoto"} para su evaluación.`
+            : "El texto de la propuesta se evalúa contra un modelo servido en esta computadora y no sale de aquí."}
         </p>
       </div>
     </div>
@@ -284,6 +276,21 @@ export function Findings({ items }) {
                   marginTop: 7, lineHeight: 1.55, fontStyle: "italic",
                 }}>
                   {f.sentence}
+                </div>
+              )}
+              {f.suggestion && (
+                <div style={{ marginTop: 7 }}>
+                  <div style={{
+                    fontFamily: F.mono, fontSize: 10.5, color: C.stampBlue,
+                    letterSpacing: ".06em", marginBottom: 3,
+                  }}>SUGGESTED REWORDING</div>
+                  <div style={{
+                    fontSize: 13.5, color: C.ink, background: "#EAEEF7",
+                    borderLeft: `3px solid ${C.stampBlue}`, padding: "8px 11px",
+                    lineHeight: 1.55,
+                  }}>
+                    {f.suggestion}
+                  </div>
                 </div>
               )}
             </div>
@@ -511,74 +518,15 @@ export function Certificado({ cotejo, descripcion, piName, proposalTitle, guarda
 
 /* ── lógica compartida ── */
 
-export function scanDei(text, termList) {
-  if (!text.trim()) return null;
-  const hits = {};
-  let total = 0;
-  termList.forEach((t) => {
-    const re = new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi");
-    const m = text.match(re);
-    if (m) { hits[t] = m.length; total += m.length; }
-  });
-  const words = text.trim().split(/\s+/).length;
-  return { hits, total, words, density: words ? (total / words) * 1000 : 0 };
-}
-
-/* Localiza cada término en las páginas: devuelve la página y la oración
-   completa donde aparece, igual que los hallazgos de DGOF/IROC. */
-/* La extracción de PDF no siempre deja límites de oración limpios. Si el
-   fragmento sale enorme, se recorta a una ventana alrededor del término. */
-function recorta(frase, term, max = 280) {
-  if (frase.length <= max) return frase;
-  const i = frase.toLowerCase().indexOf(term.toLowerCase());
-  if (i < 0) return frase.slice(0, max).trim() + "…";
-  const ini = Math.max(0, i - Math.floor(max / 2));
-  const fin = Math.min(frase.length, ini + max);
-  return (ini > 0 ? "…" : "") + frase.slice(ini, fin).trim() + (fin < frase.length ? "…" : "");
-}
-
-export function hallazgosDei(paginas, hits) {
-  const salida = [];
-  Object.keys(hits).forEach((term) => {
-    const re = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
-    for (let i = 0; i < paginas.length; i++) {
-      const oraciones = (paginas[i] || "").split(/(?<=[.!?])\s+/);
-      const frase = oraciones.find((o) => re.test(o));
-      if (frase) {
-        salida.push({
-          criterion: `Use of DEI terminology: "${term}"`,
-          page: i + 1,
-          sentence: recorta(frase.trim(), term),
-        });
-        break;
-      }
-    }
-  });
-  return salida;
-}
-
-/* Extrae el contexto alrededor de cada aparición, para mostrar dónde en el
-   texto aparece el término y no solo cuántas veces. */
-export function deiSnippets(text, term, max = 2) {
-  const re = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi");
-  const out = [];
-  let m;
-  while ((m = re.exec(text)) && out.length < max) {
-    const ini = Math.max(0, m.index - 55);
-    const fin = Math.min(text.length, m.index + m[0].length + 55);
-    out.push(
-      (ini > 0 ? "…" : "") +
-      text.slice(ini, fin).replace(/\s+/g, " ").trim() +
-      (fin < text.length ? "…" : "")
-    );
-  }
-  return out;
-}
-
 export function severityOf(kind, determination) {
   if (kind === "dgof") {
     if (determination === "likely") return "stop";
     if (determination === "potential") return "review";
+    if (determination === "insufficient") return "unknown";
+    return "clear";
+  }
+  if (kind === "dei") {
+    if (determination === "found") return "review";
     if (determination === "insufficient") return "unknown";
     return "clear";
   }

@@ -1,44 +1,41 @@
 import React, { useState, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import {
-  C, F, DEFAULT_DEI_TERMS, Shell, Intake, Resultado, DatosCertificado, Certificado, InformeHallazgos,
-  scanDei, hallazgosDei, extractText, saveCase,
+  C, Shell, Intake, Resultado, DatosCertificado, Certificado, InformeHallazgos,
+  ModelBar, useModelProvider, severityOf, runEvaluation, saveCase,
 } from "./shared.jsx";
 
-/* Cotejo DEI — corre localmente sobre el texto extraído del PDF. No usa
-   LM Studio: es un conteo determinista, auditable y repetible. */
+/* Cotejo DEI — evalúa la propuesta contra el uso de lenguaje de diversidad,
+   equidad e inclusión. Corre contra el proveedor de IA configurado, que
+   también propone cómo reescribir cada oración sin el término señalado. */
 
 function DeiPage() {
+  const health = useModelProvider();
   const [file, setFile] = useState(null);
-  const [text, setText] = useState("");
-  const [paginas, setPaginas] = useState([]);
-  const [registroId, setRegistroId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [ran, setRan] = useState(false);
+  const [dei, setDei] = useState(null);
+  const [registroId, setRegistroId] = useState(null);
   const [piName, setPiName] = useState("");
   const [proposalTitle, setProposalTitle] = useState("");
   const [emitido, setEmitido] = useState(false);
   const [guardado, setGuardado] = useState(null);
+  const [model, setModel] = useState(null);
 
-  const termList = useMemo(
-    () => DEFAULT_DEI_TERMS.map((t) => t.trim()).filter(Boolean),
-    []
+  const verdict = useMemo(
+    () => (dei ? severityOf("dei", dei.determination) : null),
+    [dei]
   );
 
-  const dei = useMemo(() => (ran ? scanDei(text, termList) : null), [ran, text, termList]);
-  const verdict = dei ? (dei.total ? "review" : "clear") : null;
-
   async function run() {
-    setErr(""); setBusy(true); setRan(false);
+    setErr(""); setBusy(true); setDei(null); setRegistroId(null);
     setEmitido(false); setGuardado(null);
     try {
-      const data = await extractText(file);
-      setText(data.text);
-      setPaginas(data.pages || [data.text]);
-      setRan(true);
+      const data = await runEvaluation({ file, tasks: ["dei"] });
+      setDei(data.dei);
+      setModel(data.model);
     } catch (e) {
-      setErr(e.message || "No se pudo completar el cotejo.");
+      setErr(e.message || "La evaluación no se completó. Revisa el documento e inténtalo otra vez.");
     } finally {
       setBusy(false);
     }
@@ -51,8 +48,7 @@ function DeiPage() {
         id: registroId,
         fileName: file?.name || null,
         piName, proposalTitle,
-        dei, verdict,
-        model: "cotejo local (sin modelo)",
+        dei, verdict, model: model || health?.model || null,
         signer: piName,
       });
       if (r?.id) setRegistroId(r.id);
@@ -63,16 +59,15 @@ function DeiPage() {
   }
 
   const oracion = !dei ? "" :
-    dei.total
-      ? `Se encontraron ${dei.total} término${dei.total === 1 ? "" : "s"} DEI en la propuesta.`
-      : "No se encontraron términos DEI en la propuesta.";
+    verdict === "clear"
+      ? "No se encontró lenguaje DEI en la propuesta."
+      : verdict === "unknown"
+        ? "El documento no contiene información suficiente para determinar el uso de lenguaje DEI."
+        : "Se encontró lenguaje DEI en la propuesta.";
 
-  const findings = useMemo(
-    () => (dei && dei.total ? hallazgosDei(paginas, dei.hits) : []),
-    [dei, paginas]
-  );
+  const findings = dei?.findings || [];
 
-  const ready = file && !busy;
+  const ready = file && !busy && health?.reachable && health?.loaded !== false;
   const hayHallazgos = findings.length > 0;
   const paso3 = !!verdict;
 
@@ -80,31 +75,25 @@ function DeiPage() {
     <Shell
       tag="DEI"
       title="Cotejo DEI"
-      blurb="Conteo y ubicación de términos de diversidad, equidad e inclusión en el texto de la propuesta. Corre localmente, sin modelo de lenguaje: el mismo documento siempre da el mismo resultado."
+      blurb="Evaluación del uso de lenguaje de diversidad, equidad e inclusión en la propuesta, con sugerencia de reescritura para cada oración señalada."
+      bar={<ModelBar health={health} />}
+      health={health}
     >
       <Intake
         file={file} setFile={setFile}
         onRun={run} busy={busy} ready={ready}
         runLabel="Iniciar cotejo DEI"
         err={err}
-        note="Este cotejo no requiere LM Studio."
+        note={health && !health.reachable ? (health.error || "El proveedor de IA configurado no está disponible.") : null}
       />
 
       {dei && (
         <Resultado
-          paso="Paso 02 · cotejo local, sin modelo"
+          paso="Paso 02"
           titulo="Resultado DEI"
           oracion={oracion}
           verdict={verdict}
-              accent={dei.total ? C.stampAmber : C.stampBlue}
-          extra={dei.total ? (
-            <div style={{
-              marginTop: 14, paddingTop: 12, borderTop: `1px dashed ${C.rule}`,
-              fontFamily: F.mono, fontSize: 11.5, color: C.soft,
-            }}>
-              {Object.keys(dei.hits).length} términos distintos · {dei.density.toFixed(1)} por mil palabras · {dei.words} palabras
-            </div>
-          ) : null}
+          accent={verdict === "clear" ? C.stampBlue : C.stampAmber}
         />
       )}
 
@@ -127,7 +116,7 @@ function DeiPage() {
       {paso3 && emitido && !hayHallazgos && (
         <Certificado
           cotejo="DEI"
-          descripcion="fue cotejada localmente contra la lista institucional de términos de diversidad, equidad e inclusión, sin que se identificara ninguno en el texto."
+          descripcion="fue evaluada mediante cotejo automatizado contra el uso de lenguaje de diversidad, equidad e inclusión, sin que se identificara ninguno en el texto."
           piName={piName} proposalTitle={proposalTitle}
           guardado={guardado}
         />

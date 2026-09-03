@@ -86,6 +86,7 @@ function IrocPage() {
       title="Cotejo IROC"
       blurb="Evaluación de investigación internacional de preocupación: sitios fuera de EE. UU., personal clave con afiliación extranjera y entidades de preocupación."
       bar={<ModelBar health={health} />}
+      health={health}
     >
       <Intake
         file={file} setFile={setFile}

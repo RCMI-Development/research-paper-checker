@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import db from "./db.js";
-import { DGOF_PROMPT, IROC_PROMPT, DGOF_RULES, IROC_RULES } from "./prompts.js";
+import { DGOF_PROMPT, IROC_PROMPT, DGOF_RULES, IROC_RULES, DEI_PROMPT } from "./prompts.js";
 import { construirCertificado, construirInforme, nombreArchivo } from "./certificado.js";
 import { askModel, getModelProvider, getProviderHealth } from "./model-provider.js";
 
@@ -113,6 +113,18 @@ const revisaHallazgos = (informe, paginas, reglas) =>
         })),
       };
 
+/* DEI no tiene reglas numeradas: el criterio sale del término que el modelo
+   identificó, y cada hallazgo trae además la sugerencia de reescritura. */
+const revisaHallazgosDei = (informe, paginas) =>
+  !informe ? informe
+    : {
+        ...informe,
+        findings: (informe.findings || []).map((f) => ({
+          ...verificaPagina(f, paginas),
+          criterion: `Use of DEI terminology: "${f.term}"`,
+        })),
+      };
+
 async function persistUpload(file) {
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -158,12 +170,14 @@ app.post("/api/evaluate", upload.single("file"), async (req, res) => {
 
     const etiquetado = paginasEtiquetadas(paginas);
     const tasks = (req.body.tasks ?? "dgof,iroc").split(",").map((t) => t.trim()).filter(Boolean);
-    const [dgofBruto, irocBruto] = await Promise.all([
+    const [dgofBruto, irocBruto, deiBruto] = await Promise.all([
       tasks.includes("dgof") ? evaluateWithModel(DGOF_PROMPT, etiquetado) : Promise.resolve(null),
       tasks.includes("iroc") ? evaluateWithModel(IROC_PROMPT, etiquetado) : Promise.resolve(null),
+      tasks.includes("dei") ? evaluateWithModel(DEI_PROMPT, etiquetado) : Promise.resolve(null),
     ]);
     const dgof = revisaHallazgos(dgofBruto, paginas, DGOF_RULES);
     const iroc = revisaHallazgos(irocBruto, paginas, IROC_RULES);
+    const dei = revisaHallazgosDei(deiBruto, paginas);
 
     res.json({
       fileName,
@@ -174,6 +188,7 @@ app.post("/api/evaluate", upload.single("file"), async (req, res) => {
       provider: modelProvider.id,
       dgof,
       iroc,
+      dei,
     });
   } catch (e) {
     console.error(e);
